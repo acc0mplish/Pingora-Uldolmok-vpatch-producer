@@ -1,0 +1,53 @@
+# The PR/push gate (issue #1745 P-P0, design D5/§9): the same local
+# gates the operator runs — fmt, clippy, tests — over the producer
+# pipeline, including the pinned codec + consumer model git deps
+# (compiling the pins IS the standing proof they build; design §3.2).
+#
+# Secrets: ULDOLMOK_REPO_PAT (repo-level, read-only) reaches exactly one
+# step — the git insteadOf mapping for the private main-repo fetch. No
+# signing secret exists at this scope (UVPB_SIGN_SEED/DIST_PUBLISH_TOKEN
+# live in the protected `signing` environment, which this workflow never
+# declares — a structural seal, see sign-release.yml's two-job split).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Spelling `true` is required (cargo rejects `1`).
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Map private main-repo git dependency fetches through the read-only PAT
+        env:
+          ULDOLMOK_REPO_PAT: ${{ secrets.ULDOLMOK_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ULDOLMOK_REPO_PAT:-}" ]; then
+            echo "ULDOLMOK_REPO_PAT is not set; the private git dependencies cannot be fetched" >&2
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${ULDOLMOK_REPO_PAT}@github.com/".insteadOf "https://github.com/"
+
+      # Honors the committed rust-toolchain.toml (stable + rustfmt +
+      # clippy) — the file takes precedence over the action's branch.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cargo fmt --check
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test

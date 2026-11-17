@@ -1,0 +1,381 @@
+# The signing/publication workflow (issue #1745 P-P3, design D3-H3 and
+# §4's two-job split):
+#
+#   job 1 `build-and-gate` (NO signing secrets) — checks out this tree,
+#   builds the pinned codec binaries with --release, runs the whole
+#   curation gate, assembles the canonical payload (pure function of
+#   rules/ + state.json + the injected clock, §3.3), and pins the
+#   artifacts' sha256 digests in an uploaded receipt draft.
+#
+#   job 2 `sign-and-publish` (environment: signing) — NO checkout, NO
+#   cargo/rustup: only download-artifact, standard sha256sum digest
+#   comparisons, the EXECUTION of job 1's digest-pinned `uvpb-sign`
+#   binary (seed on stdin), the gh CLI for the dist-repo release, and a
+#   git-data-API state bump. Every executable byte in the secret scope
+#   is (a) a protected workflow run step, (b) a standard tool, or (c)
+#   the binary job 1 hash-pinned — repo tree build code never runs here.
+#
+# Dispatch-only: no push trigger exists, so there is no accidental
+# signing path. The `signing` environment is protected (required
+# reviewer + deployment branch restriction) — its secrets
+# (UVPB_SIGN_SEED, DIST_PUBLISH_TOKEN) cannot reach job 1 at all: job 1
+# does not declare the environment, and environment-scoped secrets only
+# inject into jobs that do.
+name: sign-release
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Map private main-repo git dependency fetches through the read-only PAT
+        env:
+          ULDOLMOK_REPO_PAT: ${{ secrets.ULDOLMOK_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ULDOLMOK_REPO_PAT:-}" ]; then
+            echo "ULDOLMOK_REPO_PAT is not set; the private git dependencies cannot be fetched" >&2
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${ULDOLMOK_REPO_PAT}@github.com/".insteadOf "https://github.com/"
+
+      # Honors the committed rust-toolchain.toml. ALL build faces —
+      # rustup's toolchain read, crates.io dependency build.rs scripts,
+      # the ring C build, linking — complete inside THIS job, never in
+      # the secret job below (design D3-H3).
+      - uses: dtolnay/rust-toolchain@stable
+
+      # D5 discipline: the codec pin recorded in the protected pin.rev
+      # file is the ONLY expected rev; every Cargo.toml git dependency
+      # must carry exactly that rev (a hidden rollback or bypass of the
+      # reviewed pin refuses the release here).
+      - name: Verify Cargo.toml git pins equal the pin.rev expectation
+        run: |
+          set -euo pipefail
+          expected="$(tr -d '[:space:]' < pin.rev)"
+          if ! grep -Eq '^[0-9a-f]{40}$' <<< "$expected"; then
+            echo "pin.rev is not a 40-hex rev: $expected" >&2
+            exit 1
+          fi
+          declared="$(sed -n 's/^.*rev = "\([0-9a-f]\{40\}\)".*$/\1/p' Cargo.toml | sort -u)"
+          if [ -z "$declared" ]; then
+            echo "no git dependency rev found in Cargo.toml" >&2
+            exit 1
+          fi
+          count="$(printf '%s\n' "$declared" | wc -l | tr -d ' ')"
+          if [ "$count" -ne 1 ]; then
+            echo "Cargo.toml git pins disagree with each other:" >&2
+            printf '%s\n' "$declared" >&2
+            exit 1
+          fi
+          if [ "$declared" != "$expected" ]; then
+            echo "Cargo.toml git pin $declared != pin.rev expectation $expected" >&2
+            exit 1
+          fi
+          echo "codec pin verified: $expected"
+
+      # -p builds the GIT-DEPENDENCY package's bin from its Cargo.lock-
+      # pinned (== pin.rev-verified above) source; the pipeline's own
+      # gate/assemble bins build in the same release profile.
+      - name: Build the pinned codec binaries (release)
+        run: |
+          set -euo pipefail
+          cargo build --release -p waf-bundle-encoder --bin uvpb-sign
+          cargo build --release --bin gate --bin assemble
+
+      - name: Record the signer binary digest
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          cp target/release/uvpb-sign staging/uvpb-sign
+          chmod +x staging/uvpb-sign
+          sha256sum staging/uvpb-sign > staging/uvpb-sign.sha256
+          cat staging/uvpb-sign.sha256
+
+      - name: Run the whole curation gate (must be GREEN)
+        run: |
+          set -euo pipefail
+          ./target/release/gate --root .
+
+      - name: Assemble the canonical payload (injected clock read)
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          ./target/release/assemble \
+            --root . \
+            --now "$(date +%s)" \
+            --out staging/payload.json \
+            --sha256-out staging/payload.sha256
+
+      - name: Write the receipt draft (what the build job can vouch for)
+        run: |
+          set -euo pipefail
+          # The state file rides the artifact too (the secret job has no
+          # checkout and must still bump it). Every artifact path lives
+          # under staging/ so upload-artifact v4's least-common-ancestor
+          # root keeps the download FLAT into job 2's staging/.
+          cp state.json staging/state.json
+          python3 - <<'PY'
+          import hashlib
+          import json
+
+          payload = json.load(open("staging/payload.json"))
+          binary_sha256 = open("staging/uvpb-sign.sha256").read().split()[0]
+          payload_sha256 = open("staging/payload.sha256").read().strip()
+          # Seal: the uploaded bytes hash to exactly this (the digest the
+          # secret job re-verifies before signing — and, post-signature,
+          # the value the consumer's own verifier re-derives).
+          sealed = hashlib.sha256(open("staging/payload.json", "rb").read()).hexdigest()
+          if sealed != payload_sha256:
+              raise SystemExit(f"payload digest mismatch: sealed {payload_sha256} vs {sealed}")
+          receipt = {
+              "sequence": payload["sequence"],
+              "version": payload["version"],
+              "published_at": payload["published_at"],
+              "payload_sha256": payload_sha256,
+              "uvpb_sign_sha256": binary_sha256,
+              "producer_commit": "${{ github.sha }}".strip(),
+              "codec_pin_rev": open("pin.rev").read().strip(),
+              "stage": "build-and-gate",
+          }
+          json.dump(receipt, open("staging/receipt-draft.json", "w"), indent=1)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-inputs
+          path: |
+            staging/uvpb-sign
+            staging/uvpb-sign.sha256
+            staging/payload.json
+            staging/payload.sha256
+            staging/receipt-draft.json
+            staging/state.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-and-publish:
+    runs-on: ubuntu-latest
+    needs: build-and-gate
+    # The protected environment: required-reviewer approval + deployment
+    # branch restriction gate THIS job before any step runs. Declaring
+    # the environment here (and nowhere else) is what scopes
+    # UVPB_SIGN_SEED/DIST_PUBLISH_TOKEN to this job alone.
+    environment: signing
+    permissions:
+      # The state bump commit back into THIS repository.
+      contents: write
+    steps:
+      # Deliberately NO actions/checkout: the source tree is not
+      # referenced in the secret scope (design D3 — job 2's execution
+      # face is only the pinned binary + standard tools).
+
+      - name: Download job 1's digest-pinned artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-inputs
+          path: staging
+
+      - name: Verify both digests before anything executes
+        run: |
+          set -euo pipefail
+          expected_binary="$(python3 -c 'import json; print(json.load(open("staging/receipt-draft.json"))["uvpb_sign_sha256"])')"
+          expected_payload="$(python3 -c 'import json; print(json.load(open("staging/receipt-draft.json"))["payload_sha256"])')"
+          chmod +x staging/uvpb-sign
+          actual_binary="$(sha256sum staging/uvpb-sign | awk '{print $1}')"
+          actual_payload="$(sha256sum staging/payload.json | awk '{print $1}')"
+          if [ "$actual_binary" != "$expected_binary" ]; then
+            echo "signer binary digest mismatch: expected $expected_binary, got $actual_binary" >&2
+            exit 1
+          fi
+          if [ "$actual_payload" != "$expected_payload" ]; then
+            echo "payload digest mismatch: expected $expected_payload, got $actual_payload" >&2
+            exit 1
+          fi
+          if [ "$actual_payload" != "$(cat staging/payload.sha256 | tr -d '[:space:]')" ]; then
+            echo "payload digest disagrees with the sealed payload.sha256 file" >&2
+            exit 1
+          fi
+          echo "digests verified: binary $actual_binary"
+          echo "digests verified: payload $actual_payload"
+
+      # The ONLY producer artifact executed in the secret scope: job 1's
+      # digest-pinned signer. The seed crosses on standard input only
+      # (C-R1-8) — never an argument, never exported. uvpb-sign runs its
+      # full verify_roundtrip self-gate (consumer decode order +
+      # canonicalization + byte identity) against the signed bytes and
+      # refuses to write the envelope unless it passes — the pre-signature
+      # consumer-parser validation over the exact published bytes.
+      - name: Sign the payload with the pinned signer (seed on stdin)
+        env:
+          UVPB_SIGN_SEED: ${{ secrets.UVPB_SIGN_SEED }}
+        run: |
+          set -euo pipefail
+          if [ -z "${UVPB_SIGN_SEED:-}" ]; then
+            echo "UVPB_SIGN_SEED is not set" >&2
+            exit 1
+          fi
+          python3 - <<'PY' | ./staging/uvpb-sign staging/payload.json staging/uvpb-bundle.json
+          import base64
+          import binascii
+          import os
+          import sys
+
+          # The secret stores the 32-byte seed; GitHub secrets are text, so
+          # accept the two text-safe registrations (64-char hex or canonical
+          # base64) and pass anything else through as raw bytes. Whatever the
+          # spelling, the signer's hard "exactly 32 raw bytes on stdin" gate
+          # is the final arbiter (fail-closed).
+          seed = os.environ["UVPB_SIGN_SEED"].encode().strip()
+          if len(seed) == 64:
+              try:
+                  seed = binascii.unhexlify(seed)
+              except ValueError:
+                  pass
+          if len(seed) == 44 and seed.endswith(b"="):
+              try:
+                  seed = base64.b64decode(seed, validate=True)
+              except binascii.Error:
+                  pass
+          sys.stdout.buffer.write(seed)
+          PY
+          test -s staging/uvpb-bundle.json
+          echo "envelope written by the pinned signer (self roundtrip gate passed)"
+
+      - name: Finalize the receipt with the envelope digest
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+
+          receipt = json.load(open("staging/receipt-draft.json"))
+          envelope_bytes = open("staging/uvpb-bundle.json", "rb").read()
+          envelope = json.loads(envelope_bytes)
+          receipt["envelope_sha256"] = hashlib.sha256(envelope_bytes).hexdigest()
+          receipt["key_id"] = envelope["key_id"]
+          receipt["stage"] = "sign-and-publish"
+          json.dump(receipt, open("staging/receipt.json", "w"), indent=1)
+          print(json.dumps(receipt, indent=1))
+          PY
+
+      # C-P4-4: the sequence gate — the dist repo's latest published
+      # sequence is the floor; an equal-or-lower sequence refuses (the
+      # same-sequence-different-bytes case is the consumer's
+      # sequence_equivocation, so the producer must never mint it).
+      - name: Sequence monotonicity gate over the dist release history
+        env:
+          GH_TOKEN: ${{ secrets.DIST_PUBLISH_TOKEN }}
+          DIST_REPO: acc0mplish/Pingora-Uldolmok-vpatch-dist
+        run: |
+          set -euo pipefail
+          sequence="$(python3 -c 'import json; print(json.load(open("staging/payload.json"))["sequence"])')"
+          # curl (a standard tool) gives the EXACT HTTP status, so an auth
+          # fault can never read as "no releases yet" (404 alone is the
+          # legitimate genesis case).
+          code="$(curl -sS -o staging/latest.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${DIST_REPO}/releases/latest")"
+          tag=""
+          case "$code" in
+            200) tag="$(python3 -c 'import json; print(json.load(open("staging/latest.json")).get("tag_name", ""))')" ;;
+            404) echo "no dist releases yet (404): genesis allowed" ;;
+            *) echo "dist releases API returned HTTP $code: refusing" >&2; exit 1 ;;
+          esac
+          if [ -n "$tag" ]; then
+            previous="${tag#uvpb-seq-}"
+            case "$previous" in
+              ''|*[!0-9]*)
+                echo "latest dist release tag $tag does not follow uvpb-seq-<sequence>" >&2
+                exit 1
+                ;;
+            esac
+            if [ "$sequence" -le "$previous" ]; then
+              echo "refusing sequence $sequence: dist latest release $tag already reached $previous" >&2
+              exit 1
+            fi
+          fi
+          echo "SEQUENCE=$sequence" >> "$GITHUB_ENV"
+          echo "sequence $sequence passes the monotonicity gate (previous: ${tag:-none})"
+
+      - name: Publish the release on the dist repository
+        env:
+          GH_TOKEN: ${{ secrets.DIST_PUBLISH_TOKEN }}
+          DIST_REPO: acc0mplish/Pingora-Uldolmok-vpatch-dist
+        run: |
+          set -euo pipefail
+          version="$(python3 -c 'import json; print(json.load(open("staging/payload.json"))["version"])')"
+          cat > staging/notes.md <<NOTE
+          UVPB sequence ${SEQUENCE} (${version}).
+
+          - asset \`uvpb-bundle.json\`: signed envelope (stable URL:
+            \`https://github.com/${DIST_REPO}/releases/latest/download/uvpb-bundle.json\`)
+          - asset \`receipt.json\`: provenance (payload/envelope/signer digests,
+            key id, producer commit, codec pin)
+          - key id: \`(see receipt.json)\`
+
+          Republishing a published sequence is forbidden; corrections
+          ship as the next sequence (design D4 immutability contract).
+          NOTE
+          gh release create "uvpb-seq-${SEQUENCE}" \
+            --repo "$DIST_REPO" \
+            --title "UVPB sequence ${SEQUENCE} (${version})" \
+            --notes-file staging/notes.md \
+            staging/uvpb-bundle.json \
+            staging/receipt.json
+          echo "release uvpb-seq-${SEQUENCE} published"
+
+      # The sequencer's only writer (design §3.3): the bump commit that
+      # records the minted sequence/version/key id back into this repo,
+      # via the git data API (no checkout in the secret scope).
+      - name: Bump the producer state commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import subprocess
+
+          repo = os.environ["REPO"]
+          sequence = int(os.environ["SEQUENCE"])
+
+          old = json.load(open("staging/state.json"))
+          payload = json.load(open("staging/payload.json"))
+          envelope = json.load(open("staging/uvpb-bundle.json"))
+          new = dict(old)
+          new["sequence"] = payload["sequence"]
+          new["last_version_label"] = payload["version"]
+          new["current_key_id"] = envelope["key_id"]
+          if new.get("note") and "CI assembly pending" in new["note"]:
+              new.pop("note")
+          content = json.dumps(new, indent=1) + "\n"
+
+          meta = subprocess.run(
+              ["gh", "api", f"repos/{repo}/contents/state.json", "--jq", ".sha"],
+              capture_output=True, text=True, check=True,
+          ).stdout.strip()
+          subprocess.run(
+              ["gh", "api", "-X", "PUT", f"repos/{repo}/contents/state.json",
+               "-f", "message",
+               f"chore(state): bump to sequence {sequence} ({payload['version']}) after release uvpb-seq-{sequence}",
+               "-f", "content", base64.b64encode(content.encode()).decode(),
+               "-f", "sha", meta],
+              check=True,
+          )
+          print("state bump commit pushed: sequence", sequence)
+          PY

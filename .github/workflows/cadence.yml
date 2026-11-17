@@ -1,0 +1,70 @@
+# The publication cadence self-watch (issue #1745 P-P4, design M3/§16-8):
+# a silent producer stoppage must be DISCOVERED, not absorbed. The dist
+# repo's latest release must be younger than 10 days (N=10 — the same
+# value §16-8 fixes: the 14-day validity window minus a 4-day arithmetic
+# margin). No release at all also fails (the drill releases seeded the
+# history; a deleted history is a stoppage).
+#
+# Fully unauthenticated: the public dist API needs no token, so this
+# watch cannot leak anything and keeps working without the PAT.
+name: cadence
+on:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check the dist release cadence (fail over 10 days silent)
+        env:
+          DIST_REPO: acc0mplish/Pingora-Uldolmok-vpatch-dist
+          MAX_SILENCE_DAYS: "10"
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          import urllib.error
+          import urllib.request
+
+          repo = os.environ["DIST_REPO"]
+          max_silence = int(os.environ["MAX_SILENCE_DAYS"])
+          url = f"https://api.github.com/repos/{repo}/releases/latest"
+          request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  release = json.load(response)
+          except urllib.error.HTTPError as error:
+              if error.code == 404:
+                  sys.exit(
+                      f"dist repo {repo} has NO releases (or none published): "
+                      f"publication history missing — treat as a producer stoppage"
+                  )
+              sys.exit(f"dist releases API returned HTTP {error.code}")
+
+          tag = release.get("tag_name", "?")
+          published = release.get("published_at")
+          if not published:
+              sys.exit(f"latest release {tag} has no published_at (draft or prerelease?)")
+
+          # ISO-8601 UTC, e.g. 2026-11-17T20:19:40Z
+          from datetime import datetime, timezone
+          moment = datetime.fromisoformat(published.replace("Z", "+00:00"))
+          age_days = (datetime.now(timezone.utc) - moment).total_seconds() / 86_400
+          print(f"latest dist release {tag} published {published} ({age_days:.2f} days ago)")
+          if age_days > max_silence:
+              sys.exit(
+                  f"no publication for {age_days:.1f} days > {max_silence} day limit: "
+                  f"producer cadence breach (design M3) — check the producer pipeline"
+              )
+          print(f"cadence within the {max_silence}-day silence limit")
+          PY

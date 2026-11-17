@@ -41,6 +41,7 @@
 //!   mirrors the consumer's WAF semantics through the public
 //!   `config_model::waf_match_forms` API.
 
+pub mod assemble;
 pub mod budget;
 pub mod clock;
 pub mod gate;

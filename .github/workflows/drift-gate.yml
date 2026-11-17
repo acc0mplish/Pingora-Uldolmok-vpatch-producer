@@ -1,0 +1,82 @@
+# The drift gate (issue #1745 P-P0, design D5): the three revs that
+# must agree — the protected `pin.rev` expectation, every Cargo.toml
+# git-dependency pin, and every Cargo.lock git source rev — plus an
+# informational upstream main check.
+#
+# Why the three-way compare: pin.rev is the single-writer expectation
+# file (CODEOWNERS-protected; only the scheduled pin-refresh job edits
+# it), so a hidden Cargo.toml rollback that skips the refresh job is a
+# pin.rev != Cargo.toml red, and a lock/source desync is a Cargo.toml !=
+# Cargo.lock red. The upstream main comparison is WARNING ONLY (an
+# upstream landing that outpaces the pin is operational, not a
+# drift fault — the refusal condition is pin disagreement alone).
+name: drift-gate
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "pin.rev"
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare pin.rev, Cargo.toml pins, and Cargo.lock sources
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          import sys
+
+          expected = open("pin.rev").read().strip()
+          if not re.fullmatch(r"[0-9a-f]{40}", expected):
+              sys.exit(f"pin.rev is not a 40-hex rev: {expected!r}")
+
+          declared = sorted(set(re.findall(r'rev = "([0-9a-f]{40})"', open("Cargo.toml").read())))
+          if not declared:
+              sys.exit("no git dependency rev found in Cargo.toml")
+
+          locked = sorted(set(re.findall(r'rev=([0-9a-f]{40})', open("Cargo.lock").read())))
+          if not locked:
+              sys.exit("no git source rev found in Cargo.lock")
+
+          status = 0
+          if declared != [expected]:
+              print(f"::error::Cargo.toml git pins {declared} != pin.rev expectation {expected}")
+              status = 1
+          if locked != [expected]:
+              print(f"::error::Cargo.lock git sources {locked} != pin.rev expectation {expected}")
+              status = 1
+          if status == 0:
+              print(f"pin agreement verified: {expected}")
+          sys.exit(status)
+          PY
+
+      # Informational upstream check (warning only — see the header).
+      - name: Compare the pin against upstream main (warning only)
+        env:
+          ULDOLMOK_REPO_PAT: ${{ secrets.ULDOLMOK_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          expected="$(tr -d '[:space:]' < pin.rev)"
+          upstream="$(git ls-remote https://github.com/acc0mplish/Pingora-Uldolmok.git refs/heads/main | awk '{print $1}')"
+          if [ -z "$upstream" ]; then
+            echo "::warning::could not read upstream main (missing PAT or network); pin comparison skipped"
+            exit 0
+          fi
+          if [ "$upstream" != "$expected" ]; then
+            echo "::warning::upstream main $upstream has moved past the pin $expected — schedule a pin-refresh PR (informational; the pin is still self-consistent)"
+          else
+            echo "pin $expected equals upstream main"
+          fi
