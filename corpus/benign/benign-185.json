@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/fabric-body.txt", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 30_local_service_fabric.sh"}
+{"method": "POST", "path": "/api/v1/reports", "query": "", "user_agent": "curl/8.7.1", "source": "synthetic (e2e-shape)", "body": "{\"dry_run\":true}"}

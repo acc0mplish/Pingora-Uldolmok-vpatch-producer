@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/auth/login", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 06_tls_restore_and_legacy.sh", "body": "{\"username\":\"admin\",\"password\":\"Recovered-Strong-Password-8!\"}"}
+{"method": "POST", "path": "/api/v1/archive", "query": "", "user_agent": "", "source": "synthetic (e2e-shape)", "body": "{\"enabled\":true,\"retention_days\":30}"}

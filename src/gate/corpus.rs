@@ -40,6 +40,11 @@ pub enum CorpusDiagnostic {
     RuleFileUnparsable {
         file: String,
     },
+    /// Fail-closed (L4): a curation directory could not be read at
+    /// all — the gate refuses rather than treating it as empty.
+    DirectoryUnreadable {
+        path: String,
+    },
     ExploitSampleMissing {
         rule_id: String,
     },
@@ -61,8 +66,22 @@ pub enum CorpusDiagnostic {
         rule_id: String,
         exploit_sample: String,
     },
+    /// The corpus honesty seal (design §5), enforced BY the gate: a
+    /// benign request contains a consumer seed pattern in one of its
+    /// match forms — the corpus must not carry the very strings the
+    /// seeds model.
+    BenignSeedViolation {
+        benign_file: String,
+        seed_type: String,
+        seed_pattern: String,
+    },
     BenignCorpusTooSmall {
         count: usize,
+    },
+    /// An approvable-candidate file that does not parse is named
+    /// instead of silently skipped (L2).
+    CandidateFileUnparsable {
+        file: String,
     },
 }
 
@@ -70,12 +89,15 @@ impl CorpusDiagnostic {
     pub fn code(&self) -> &'static str {
         match self {
             CorpusDiagnostic::RuleFileUnparsable { .. } => "rule_file_unparsable",
+            CorpusDiagnostic::DirectoryUnreadable { .. } => "directory_unreadable",
             CorpusDiagnostic::ExploitSampleMissing { .. } => "exploit_sample_missing",
             CorpusDiagnostic::ExploitSampleUnparsable { .. } => "exploit_sample_unparsable",
             CorpusDiagnostic::ExploitSampleNoMatch { .. } => "exploit_sample_no_match",
             CorpusDiagnostic::BenignFileUnparsable { .. } => "benign_file_unparsable",
             CorpusDiagnostic::BenignMatch { .. } => "benign_match",
+            CorpusDiagnostic::BenignSeedViolation { .. } => "benign_seed_violation",
             CorpusDiagnostic::BenignCorpusTooSmall { .. } => "benign_corpus_too_small",
+            CorpusDiagnostic::CandidateFileUnparsable { .. } => "candidate_file_unparsable",
         }
     }
 
@@ -84,6 +106,11 @@ impl CorpusDiagnostic {
             "rule_file_unparsable" => {
                 "A rules/*.json file is not a valid UVPB feed rule; \
                 the gate cannot judge what it cannot parse."
+            }
+            "directory_unreadable" => {
+                "A curation directory could not be read (fail-closed): \
+                the gate refuses rather than treating the tree as empty — fix the \
+                filesystem error before curating."
             }
             "exploit_sample_missing" => {
                 "Every rule must carry a recorded exploit sample \
@@ -108,9 +135,19 @@ impl CorpusDiagnostic {
                 layer 2b) — the named benign file, rule, and its exploit sample let the \
                 curator judge which side is wrong before publication."
             }
+            "benign_seed_violation" => {
+                "A benign corpus request contains a consumer seed \
+                pattern in one of its match forms — the corpus is dishonest about its \
+                innocence and must be cleaned before publication."
+            }
             "benign_corpus_too_small" => {
                 "Publication never starts with a benign corpus \
                 below 200 honest innocent requests (design §5 layer 2, L3)."
+            }
+            "candidate_file_unparsable" => {
+                "A candidates/*.json file does not parse — its \
+                approvable candidates cannot be qualified, so the file is named \
+                instead of silently skipped."
             }
             _ => return None,
         })
@@ -122,6 +159,9 @@ impl std::fmt::Display for CorpusDiagnostic {
         match self {
             CorpusDiagnostic::RuleFileUnparsable { file } => {
                 write!(formatter, "rule file {file} does not parse as a feed rule")
+            }
+            CorpusDiagnostic::DirectoryUnreadable { path } => {
+                write!(formatter, "directory {path} is unreadable (fail-closed)")
             }
             CorpusDiagnostic::ExploitSampleMissing { rule_id } => {
                 write!(formatter, "rule {rule_id} has no corpus/exploits/{rule_id}.json sample")
@@ -144,10 +184,21 @@ impl std::fmt::Display for CorpusDiagnostic {
                 formatter,
                 "BENIGN MATCH: {benign_file} matches rule {rule_id} (its exploit sample: {exploit_sample})"
             ),
+            CorpusDiagnostic::BenignSeedViolation {
+                benign_file,
+                seed_type,
+                seed_pattern,
+            } => write!(
+                formatter,
+                "BENIGN SEED VIOLATION: {benign_file} contains seed ({seed_type}, `{seed_pattern}`)"
+            ),
             CorpusDiagnostic::BenignCorpusTooSmall { count } => write!(
                 formatter,
                 "benign corpus has {count} requests (floor is {BENIGN_MIN})"
             ),
+            CorpusDiagnostic::CandidateFileUnparsable { file } => {
+                write!(formatter, "candidate file {file} does not parse")
+            }
         }
     }
 }
@@ -183,13 +234,14 @@ impl GateReport {
     }
 }
 
-fn json_files(directory: &Path) -> Vec<(String, PathBuf)> {
-    let mut files: Vec<(String, PathBuf)> = std::fs::read_dir(directory)
-        .into_iter()
-        .flatten()
-        .flatten()
+/// Lists a curation directory's *.json files. Errors propagate (L4,
+/// fail-closed): an unreadable directory must be reported, never
+/// silently treated as empty — a permissions failure would otherwise
+/// read as a green tree of zero rules.
+fn json_files(directory: &Path) -> std::io::Result<Vec<(String, PathBuf)>> {
+    let mut files: Vec<(String, PathBuf)> = std::fs::read_dir(directory)?
         .filter_map(|entry| {
-            let path = entry.path();
+            let path = entry.ok()?.path();
             if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
                 let name = path.file_name()?.to_str()?.to_owned();
                 Some((name, path))
@@ -199,7 +251,29 @@ fn json_files(directory: &Path) -> Vec<(String, PathBuf)> {
         })
         .collect();
     files.sort();
-    files
+    Ok(files)
+}
+
+/// Lists a directory, reporting a [`CorpusDiagnostic::DirectoryUnreadable`]
+/// on failure (the caller then proceeds over an empty listing — every
+/// downstream duty check fails closed on the empty side). A MISSING
+/// directory stays legal-empty: a tree before its first curation PR
+/// (no `rules/` entries, no exploit samples) is a legitimate green
+/// tree, while an unreadable PRESENT directory is a filesystem fault.
+fn list_or_report(
+    directory: &Path,
+    diagnostics: &mut Vec<CorpusDiagnostic>,
+) -> Vec<(String, PathBuf)> {
+    match json_files(directory) {
+        Ok(files) => files,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(_) => {
+            diagnostics.push(CorpusDiagnostic::DirectoryUnreadable {
+                path: directory.display().to_string(),
+            });
+            Vec::new()
+        }
+    }
 }
 
 fn parse_requests(files: &[(String, PathBuf)]) -> Vec<(String, Option<CorpusRequest>)> {
@@ -226,33 +300,56 @@ fn rule_pattern_type(rule: &WafFeedRule) -> PatternType {
     }
 }
 
+/// The seed blocklist's wire spelling of a pattern type (identical
+/// snake_case vocabulary). Unknown spellings (a future codec seed
+/// type) return `None` and are skipped — the seal coverage is the
+/// known set.
+fn seed_pattern_type(wire: &str) -> Option<PatternType> {
+    match wire {
+        "query_string" => Some(PatternType::QueryString),
+        "request_uri" => Some(PatternType::RequestUri),
+        "user_agent" => Some(PatternType::UserAgent),
+        "request_method" => Some(PatternType::RequestMethod),
+        "request_body" => Some(PatternType::RequestBody),
+        _ => None,
+    }
+}
+
 /// The two-way corpus gate over already-parsed rules: detection duty
-/// per rule, false-positive duty and the floor over the benign corpus.
+/// per rule, false-positive duty, the honesty seal, and the floor over
+/// the benign corpus.
 fn corpus_check(rules: &[WafFeedRule], root: &Path) -> Vec<CorpusDiagnostic> {
     let mut diagnostics = Vec::new();
-    let exploits = json_files(&root.join("corpus/exploits"));
+    let exploits = list_or_report(&root.join("corpus/exploits"), &mut diagnostics);
     let exploit_requests: BTreeMap<String, Option<CorpusRequest>> =
         parse_requests(&exploits).into_iter().collect();
-    let benign = json_files(&root.join("corpus/benign"));
+    let benign = list_or_report(&root.join("corpus/benign"), &mut diagnostics);
     let benign_requests = parse_requests(&benign);
 
     let mut rule_forms: Vec<(&WafFeedRule, RequestForms)> = Vec::new();
     for rule in rules {
         let sample_file = format!("{}.json", rule.id);
-        let Some(Some(sample)) = exploit_requests.get(&sample_file) else {
-            diagnostics.push(CorpusDiagnostic::ExploitSampleMissing {
+        // L1: an absent sample and an UNPARSABLE sample are different
+        // failures — the latter names the broken file.
+        match exploit_requests.get(&sample_file) {
+            None => diagnostics.push(CorpusDiagnostic::ExploitSampleMissing {
                 rule_id: rule.id.clone(),
-            });
-            continue;
-        };
-        let forms = RequestForms::build(sample);
-        if forms.matches(rule_pattern_type(rule), &rule.pattern) {
-            rule_forms.push((rule, forms));
-        } else {
-            diagnostics.push(CorpusDiagnostic::ExploitSampleNoMatch {
+            }),
+            Some(None) => diagnostics.push(CorpusDiagnostic::ExploitSampleUnparsable {
                 rule_id: rule.id.clone(),
                 file: format!("corpus/exploits/{sample_file}"),
-            });
+            }),
+            Some(Some(sample)) => {
+                let forms = RequestForms::build(sample);
+                if forms.matches(rule_pattern_type(rule), &rule.pattern) {
+                    rule_forms.push((rule, forms));
+                } else {
+                    diagnostics.push(CorpusDiagnostic::ExploitSampleNoMatch {
+                        rule_id: rule.id.clone(),
+                        file: format!("corpus/exploits/{sample_file}"),
+                    });
+                }
+            }
         }
     }
 
@@ -273,6 +370,20 @@ fn corpus_check(rules: &[WafFeedRule], root: &Path) -> Vec<CorpusDiagnostic> {
                 });
             }
         }
+        // The corpus honesty seal (design §5), enforced here in the
+        // gate — not only by a test: no benign request may contain a
+        // consumer seed pattern in any of its match forms.
+        for (seed_type, seed_pattern) in waf_bundle_encoder::seed_blocklist() {
+            if let Some(pattern_type) = seed_pattern_type(seed_type) {
+                if forms.matches(pattern_type, seed_pattern) {
+                    diagnostics.push(CorpusDiagnostic::BenignSeedViolation {
+                        benign_file: format!("corpus/benign/{name}"),
+                        seed_type: seed_type.clone(),
+                        seed_pattern: seed_pattern.clone(),
+                    });
+                }
+            }
+        }
     }
     // The floor counts VALID requests, not files: an unparsable file
     // is its own diagnostic and simultaneously drops the valid count.
@@ -290,14 +401,19 @@ fn corpus_check(rules: &[WafFeedRule], root: &Path) -> Vec<CorpusDiagnostic> {
 
 /// The approvable-candidate lint pass: every `proposed` candidate with
 /// a provenance must pass the literal lint to keep its approval-PR
-/// qualification; failures are warnings (and fail the exit).
-fn candidate_check(root: &Path) -> Vec<CandidateWarning> {
+/// qualification; failures are warnings (and fail the exit). An
+/// unparsable candidate FILE is named (L2) instead of silently
+/// skipping its qualification.
+fn candidate_check(root: &Path, diagnostics: &mut Vec<CorpusDiagnostic>) -> Vec<CandidateWarning> {
     let mut warnings = Vec::new();
-    for (name, path) in json_files(&root.join("candidates")) {
-        let Ok(bytes) = std::fs::read(&path) else {
-            continue;
-        };
-        let Ok(file) = serde_json::from_slice::<crate::schema::CandidateFile>(&bytes) else {
+    for (name, path) in list_or_report(&root.join("candidates"), diagnostics) {
+        let parsed = std::fs::read(&path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<crate::schema::CandidateFile>(&bytes).ok());
+        let Some(file) = parsed else {
+            diagnostics.push(CorpusDiagnostic::CandidateFileUnparsable {
+                file: format!("candidates/{name}"),
+            });
             continue;
         };
         for candidate in file.approvable() {
@@ -317,12 +433,13 @@ fn candidate_check(root: &Path) -> Vec<CandidateWarning> {
 /// Runs the whole-tree gate: rule lint + two-way corpus + approvable
 /// candidate lint + the codec publish-gate assertion. Missing
 /// directories read as empty (a tree before its first curation PR is
-/// a legal green tree of zero rules).
+/// a legal green tree of zero rules); present-but-unreadable
+/// directories are fail-closed diagnostics (L4).
 pub fn run_gate(root: &Path) -> GateReport {
     let mut rule_diagnostics: BTreeMap<String, Vec<Diagnostic>> = BTreeMap::new();
     let mut corpus_diagnostics: Vec<CorpusDiagnostic> = Vec::new();
     let mut rules = Vec::new();
-    for (name, path) in json_files(&root.join("rules")) {
+    for (name, path) in list_or_report(&root.join("rules"), &mut corpus_diagnostics) {
         match std::fs::read(&path)
             .ok()
             .and_then(|bytes| serde_json::from_slice::<WafFeedRule>(&bytes).ok())
@@ -342,9 +459,9 @@ pub fn run_gate(root: &Path) -> GateReport {
         }
     }
     corpus_diagnostics.extend(corpus_check(&rules, root));
-    let candidate_warnings = candidate_check(root);
+    let candidate_warnings = candidate_check(root, &mut corpus_diagnostics);
     let publish_rejection = publish_gate_check(&rules).err();
-    let benign_count = json_files(&root.join("corpus/benign")).len();
+    let benign_count = list_or_report(&root.join("corpus/benign"), &mut corpus_diagnostics).len();
     GateReport {
         rules_checked: rules.len(),
         benign_count,

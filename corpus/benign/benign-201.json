@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/mb-body", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 49_maintenance_board.sh"}
+{"method": "PUT", "path": "/api/v1/items/1", "query": "", "user_agent": "Mozilla/5.0 (Macintosh) Safari/17.0", "source": "synthetic (e2e-shape)", "body": "{\"description\":\"updated\"}"}

@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/acme-orders", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01b_acme_certificates.sh", "body": "{\"name\":\"e2e-cloudflare\",\"provider_type\":\"cloudflare\",\"credentials\":{\"zone_id\":\"abcdef0123456789abcdef0123456789\",\"api_token\":\"e2e-dns-provider-token\"}}"}
+{"method": "GET", "path": "/api/v1/search", "query": "q=%EC%A6%90%EA%B2%A8%EC%B0%BE%EA%B8%B0", "user_agent": "Mozilla/5.0 (Macintosh) Safari/17.0", "source": "synthetic (e2e-shape)"}

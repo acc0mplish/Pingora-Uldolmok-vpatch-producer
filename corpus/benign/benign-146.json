@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/backup/restore", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05_backup_and_runtime.sh", "body": "1"}
+{"method": "POST", "path": "/api/v1/items", "query": "", "user_agent": "Mozilla/5.0 (Macintosh) Safari/17.0", "source": "synthetic (e2e-shape)", "body": "{\"name\":\"sample-1\",\"enabled\":true}"}

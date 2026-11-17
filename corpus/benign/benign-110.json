@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/acme-orders/1", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01b_acme_certificates.sh", "body": "{\"enabled\":true,\"renew_before_days\":30}"}
+{"method": "GET", "path": "/share/landing", "query": "utm_source=newsletter", "user_agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/132.0", "source": "synthetic (e2e-shape)"}

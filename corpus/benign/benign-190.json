@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/policy-changes", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 35_data_protection_policy.sh"}
+{"method": "POST", "path": "/form/submit", "query": "", "user_agent": "curl/8.7.1", "source": "synthetic (e2e-shape)", "body": "field=1&other=2"}

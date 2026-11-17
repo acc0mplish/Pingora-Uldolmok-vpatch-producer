@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/mb-page.headers", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 49_maintenance_board.sh"}
+{"method": "PUT", "path": "/api/v1/items/1", "query": "", "user_agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/132.0", "source": "synthetic (e2e-shape)", "body": "{\"description\":\"updated\"}"}

@@ -67,6 +67,16 @@ fn lowered(forms: impl Iterator<Item = String>) -> Vec<String> {
     forms.map(|form| form.to_ascii_lowercase()).collect()
 }
 
+/// The body phase's inspection ceiling, mirrored from the consumer's
+/// public `WAF_BODY_INSPECTION_MAX_BYTES` (config-model
+/// `waf_evidence.rs`: 1024 * 1024). A body past it never reaches the
+/// consumer's body matching at all — the phase answers `Oversize`
+/// before any rule comparison (`waf.rs` body phase) — so an oversized
+/// corpus sample must be a NO-MATCH here too: treating it as matchable
+/// would let an exploit sample "prove" detection duty the consumer
+/// cannot deliver.
+const BODY_INSPECTION_MAX_BYTES: usize = 1024 * 1024;
+
 impl RequestForms {
     /// Builds every field's forms for one corpus request, mirroring the
     /// consumer field-for-field.
@@ -81,7 +91,11 @@ impl RequestForms {
             // lowercase seed plus the `+`-normalized decode forms,
             // deduplicated in first-seen order (order is irrelevant to
             // the any-form verdict; the dedup keeps the vector small).
-            Some(body) => {
+            // The Oversize guard mirrors the consumer phase order: a
+            // body past [`BODY_INSPECTION_MAX_BYTES`] is never matched
+            // (empty form set), exactly as the consumer answers
+            // `Oversize` before any rule comparison.
+            Some(body) if body.len() <= BODY_INSPECTION_MAX_BYTES => {
                 let mut forms = vec![body.to_ascii_lowercase()];
                 for form in config_model::waf_match_forms(&body.replace('+', " ")) {
                     let lowered = form.to_ascii_lowercase();
@@ -91,7 +105,7 @@ impl RequestForms {
                 }
                 forms
             }
-            None => Vec::new(),
+            _ => Vec::new(),
         };
         Self {
             query: query_lowered,

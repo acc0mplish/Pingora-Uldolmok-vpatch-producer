@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/api/v1/proxy-hosts", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 06_tls_restore_and_legacy.sh"}
+{"method": "POST", "path": "/api/v1/reports", "query": "", "user_agent": "Mozilla/5.0 (Macintosh) Safari/17.0", "source": "synthetic (e2e-shape)", "body": "{\"dry_run\":true}"}

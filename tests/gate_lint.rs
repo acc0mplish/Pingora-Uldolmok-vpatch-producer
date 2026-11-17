@@ -19,8 +19,8 @@ fn base_rule() -> WafFeedRule {
         pattern: "wp-content/plugins/elementor/upload/".to_owned(),
         severity: "warning".to_owned(),
         description: "Detects the Elementor upload-path traversal variant.".to_owned(),
-        sort_order: 0,
-        advisory: None,
+        sort_order: 1_000_000,
+        advisory: Some(advisory(vec!["CVE-2024-12345".to_owned()], Vec::new(), "")),
     }
 }
 
@@ -277,7 +277,7 @@ fn c_p2_1_cve_ids_must_be_canonical_uppercase() {
 fn c_p2_1_references_must_be_https() {
     let mut rule = base_rule();
     rule.advisory = Some(advisory(
-        Vec::new(),
+        vec!["CVE-2024-12345".to_owned()],
         vec!["http://example.org/advisory".to_owned()],
         "",
     ));
@@ -305,7 +305,11 @@ fn c_p2_1_advisory_re_serialization_ceiling() {
 #[test]
 fn c_p2_1_source_note_ceiling() {
     let mut rule = base_rule();
-    rule.advisory = Some(advisory(Vec::new(), Vec::new(), &"x".repeat(257)));
+    rule.advisory = Some(advisory(
+        vec!["CVE-2024-12345".to_owned()],
+        Vec::new(),
+        &"x".repeat(257),
+    ));
     only(&rule, Diagnostic::SourceNoteTooLong { bytes: 257 });
 }
 

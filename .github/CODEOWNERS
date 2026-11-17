@@ -9,3 +9,5 @@
 /rules/ @acc0mplish
 /candidates/ @acc0mplish
 /corpus/ @acc0mplish
+/data/ @acc0mplish
+/tests/ @acc0mplish

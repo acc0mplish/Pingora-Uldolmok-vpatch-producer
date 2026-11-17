@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/api/v1/raw-logs", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 43_raw_log_browser.sh"}
+{"method": "POST", "path": "/api/v1/notifications/test", "query": "", "user_agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/132.0", "source": "synthetic (e2e-shape)", "body": "{\"target\":\"#ops\",\"channel\":\"slack\"}"}

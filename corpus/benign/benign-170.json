@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/access-lists", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 07_route_access_policies.sh", "body": "{\"name\":\"route-admin-office\",\"policy\":{\"rules\":[{\"action\":\"allow\",\"address\":{\"cidr\":\"192.0.2.0/24\"}}]}}"}
+{"method": "POST", "path": "/api/v1/items", "query": "", "user_agent": "curl/8.7.1", "source": "synthetic (e2e-shape)", "body": "{\"name\":\"sample-1\",\"enabled\":true}"}

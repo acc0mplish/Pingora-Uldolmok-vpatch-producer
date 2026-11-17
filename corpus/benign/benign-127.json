@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/proxy-hosts", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 03_security_and_streams.sh", "body": "{\"hostname\":\"bot-invalid.test\",\"upstream\":{\"scheme\":\"http\",\"host\":\"127.0.0.1\",\"port\":"}
+{"method": "GET", "path": "/api/v1/search", "query": "q=%EC%A6%90%EA%B2%A8%EC%B0%BE%EA%B8%B0", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)"}

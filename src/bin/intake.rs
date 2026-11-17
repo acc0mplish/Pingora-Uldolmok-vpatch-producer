@@ -13,6 +13,9 @@
 //!   fails gets NO candidate file this run — like the consumer's LKG
 //!   preservation, the absence of a write is the safe outcome; the
 //!   next run retries it.
+//! - A failed persistence is a FAILURE, not a generated file: the
+//!   write boundary reports the error and the counts/exit code
+//!   reflect it (no phantom generated totals).
 //! - Budget stop, not budget sleep: a spent daily ceiling ends the
 //!   sweep with a resume instant instead of sleeping to UTC midnight
 //!   (single-CVE mode reports it and exits non-zero).
@@ -71,7 +74,7 @@ fn main() -> ExitCode {
         Mode::KevSnapshot => run_kev_snapshot(&args, &fetcher, &mut budgets, &clock),
     };
     println!(
-        "intake: finished in {}s (fetch errors: {failed})",
+        "intake: finished in {}s (fetch/write errors: {failed})",
         started.elapsed().as_secs()
     );
     if failed > 0 {
@@ -156,8 +159,11 @@ fn run_single(
         kev_entry,
         clock.now_unix(),
     );
-    persist(args, &mut file);
-    0
+    if persist(args, &mut file) {
+        0
+    } else {
+        1
+    }
 }
 
 fn run_kev_snapshot(
@@ -210,8 +216,13 @@ fn run_kev_snapshot(
             Some(entry),
             clock.now_unix(),
         );
-        persist(args, &mut file);
-        generated += 1;
+        if persist(args, &mut file) {
+            generated += 1;
+        } else {
+            // A failed write is NOT a generated file (L7) — it counts
+            // as a failure and is reported by persist's own line.
+            failed += 1;
+        }
     }
     let now = clock.now_unix();
     println!(
@@ -225,7 +236,10 @@ fn run_kev_snapshot(
 /// then write (or summarize for a dry run). A flip count above zero
 /// here would mean the generator emitted a provenance-less candidate —
 /// the report line makes that visible instead of silently normalizing.
-fn persist(args: &Args, file: &mut CandidateFile) {
+/// Returns `true` when the file was produced (written, or summarized
+/// in a dry run) and `false` when persistence FAILED — the caller must
+/// not count a failed write as generated.
+fn persist(args: &Args, file: &mut CandidateFile) -> bool {
     let flipped = file.enforce_provenance();
     let approvable = file.approvable().count();
     let severity = severity_of(file.kev, file.cvss);
@@ -240,7 +254,7 @@ fn persist(args: &Args, file: &mut CandidateFile) {
         approvable
     );
     if args.dry_run {
-        return;
+        return true;
     }
     if flipped > 0 {
         eprintln!(
@@ -250,18 +264,20 @@ fn persist(args: &Args, file: &mut CandidateFile) {
     }
     if let Err(error) = std::fs::create_dir_all(&args.out) {
         eprintln!("intake: creating {}: {error}", args.out.display());
-        return;
+        return false;
     }
     let path = args.out.join(format!("{}.json", file.cve));
     let mut bytes = match serde_json::to_vec_pretty(file) {
         Ok(bytes) => bytes,
         Err(error) => {
             eprintln!("intake: serializing {}: {error}", file.cve);
-            return;
+            return false;
         }
     };
     bytes.push(b'\n');
     if let Err(error) = std::fs::write(&path, bytes) {
         eprintln!("intake: writing {}: {error}", path.display());
+        return false;
     }
+    true
 }

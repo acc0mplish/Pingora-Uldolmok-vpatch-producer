@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/backup", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05_backup_and_runtime.sh", "body": "{}"}
+{"method": "POST", "path": "/api/v1/notifications/test", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)", "body": "{\"target\":\"#ops\",\"channel\":\"slack\"}"}

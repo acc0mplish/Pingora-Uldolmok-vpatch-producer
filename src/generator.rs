@@ -255,4 +255,31 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn every_relation_table_row_produces_lint_clean_candidates() {
+        // A table row whose generator output the P-P2 lint refuses
+        // (e.g. a standalone common word like `/login`) would mint
+        // committed candidates that turn the gate REFUSED the moment
+        // they exist — the table must only hint context-bound
+        // entrypoints. This regression binds every row (and the plugin
+        // template) to the lint's literal core.
+        use crate::gate::lint::lint_candidate_literal;
+        use crate::schema::PatternType;
+
+        let table = RelationTable::parse(RELATION_TABLE_JSON);
+        for slug in &table.plugins {
+            let literal = format!("{PLUGIN_ENTRYPOINT_TEMPLATE}{slug}/");
+            assert!(
+                lint_candidate_literal(&literal, PatternType::RequestUri).is_empty(),
+                "plugin template output for {slug} must pass the lint: {literal}"
+            );
+        }
+        for (token, entrypoint) in &table.entries {
+            assert!(
+                lint_candidate_literal(entrypoint, PatternType::RequestUri).is_empty(),
+                "relation-table entrypoint for {token} must pass the lint: {entrypoint}"
+            );
+        }
+    }
 }

@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/api/v1/logs/access/client-summaries", "query": "client=198.51.100.23", "user_agent": "curl/8.7.1", "source": "e2e scenario 23_identity_ingress.sh", "body": "\\r"}
+{"method": "POST", "path": "/api/v1/reports", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)", "body": "{\"dry_run\":true}"}

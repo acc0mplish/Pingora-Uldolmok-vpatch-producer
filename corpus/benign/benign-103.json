@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/auth/login", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01_auth_and_certificates.sh", "body": "{\"username\":\"rate-limit-probe\",\"password\":\"Wrong-Password-7!\"}"}
+{"method": "GET", "path": "/assets/group-1/icon.svg", "query": "", "user_agent": "curl/8.7.1", "source": "synthetic (e2e-shape)"}

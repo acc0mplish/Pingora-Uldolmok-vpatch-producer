@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/streams", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 04_streams_and_observability.sh", "body": "{\"name\":\"e2e-stats-dead\",\"listen_port\":"}
+{"method": "POST", "path": "/api/v1/notes", "query": "", "user_agent": "Mozilla/5.0 (Macintosh) Safari/17.0", "source": "synthetic (e2e-shape)", "body": "{\"title\":\"weekly note\"}"}

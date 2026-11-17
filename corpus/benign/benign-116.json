@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/access-lists", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 02_ddns_notifications_and_access.sh", "body": "{\"name\":\"bad-cidr\",\"policy\":{\"rules\":[{\"action\":\"allow\",\"address\":{\"cidr\":\"10.0.0.0/33\"}}]}}"}
+{"method": "GET", "path": "/api/v1/items", "query": "page=2&per_page=25", "user_agent": "", "source": "synthetic (e2e-shape)"}

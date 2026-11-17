@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/auth/login", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01_auth_and_certificates.sh", "body": "{\"username\":\"admin\",\"password\":\"Correct-Horse-Battery-7\"}"}
+{"method": "GET", "path": "/static/app.main.js", "query": "v=1", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)"}

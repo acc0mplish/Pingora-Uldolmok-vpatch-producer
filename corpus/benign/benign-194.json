@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/ha45-mark-freeze", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 45_ha_control_plane_failover.sh"}
+{"method": "POST", "path": "/api/v1/items", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)", "body": "{\"name\":\"sample-1\",\"enabled\":true}"}

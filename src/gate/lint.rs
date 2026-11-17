@@ -19,7 +19,9 @@
 //!   PR qualification.
 
 use crate::schema::{canonical_cve_id, PatternType};
-use config_model::waf_feed::{WafFeedAdvisory, WafFeedPayload, WafFeedRule};
+use config_model::waf_feed::{
+    WafFeedAdvisory, WafFeedPayload, WafFeedRule, WAF_FEED_SORT_ORDER_MAX, WAF_FEED_SORT_ORDER_MIN,
+};
 use config_model::ManagedWafPatternType;
 use waf_bundle_encoder::{publish_gate, seed_blocklist};
 
@@ -35,6 +37,15 @@ const SOURCE_NOTE_MAX_BYTES: usize = 256;
 const PATTERN_MIN_BYTES: usize = 4;
 /// Pattern byte ceiling.
 const PATTERN_MAX_BYTES: usize = 256;
+/// Rule name byte ceiling — the consumer's private
+/// `WAF_FEED_MAX_NAME_BYTES` (canonicalize_rule).
+const NAME_MAX_BYTES: usize = 128;
+/// Category byte ceiling — the consumer's private
+/// `WAF_FEED_MAX_CATEGORY_BYTES` (canonicalize_rule).
+const CATEGORY_MAX_BYTES: usize = 64;
+/// Description byte ceiling — the consumer's private
+/// `WAF_FEED_MAX_DESCRIPTION_BYTES` (canonicalize_rule).
+const DESCRIPTION_MAX_BYTES: usize = 512;
 
 /// Common English words a pattern must never consist of alone (plus a
 /// little punctuation): a standalone common word matches ordinary
@@ -210,11 +221,32 @@ pub enum Diagnostic {
         category: String,
     },
     CategoryEmpty,
+    /// The consumer lowercases + trims the category and then requires
+    /// `[a-z0-9_-]`; design §3.4 rule 2 requires the signed bytes to
+    /// already be that canonical spelling.
+    CategoryNotCanonical {
+        category: String,
+    },
     SeverityVocabulary {
         severity: String,
     },
     EmptyName,
+    NameTooLong {
+        bytes: usize,
+    },
+    NameControlChar,
     EmptyDescription,
+    DescriptionTooLong {
+        bytes: usize,
+    },
+    DescriptionControlChar,
+    /// The consumer clamps `sort_order` into the feed window; design
+    /// §3.4 rule 2 (정규화 선적용) requires values already inside it —
+    /// a clamped rule would mean the signed bytes differ from the
+    /// stored rule.
+    SortOrderOutOfRange {
+        sort_order: i64,
+    },
     CveIdFormat {
         cve: String,
     },
@@ -226,6 +258,21 @@ pub enum Diagnostic {
     },
     SourceNoteTooLong {
         bytes: usize,
+    },
+    /// The consumer trims `source_note` and rejects control characters;
+    /// the signed bytes must already be trim-canonical.
+    SourceNoteNotCanonical,
+    /// §7 L4: every `vp-cve-*` rule must carry an advisory — the
+    /// consumer metadata worker only activates on feed rules whose
+    /// advisory carries CVE ids, so an advisory-less CVE rule is a
+    /// self-inflicted dormant feature.
+    AdvisoryRequired {
+        id: String,
+    },
+    /// The advisory is present but carries no CVE ids — the same §7 L4
+    /// dormancy with the advisory shell in place.
+    CveIdsEmpty {
+        id: String,
     },
     SeedDuplicate {
         pattern_type: String,
@@ -247,13 +294,22 @@ impl Diagnostic {
             Diagnostic::IdFormat { .. } => "id_format",
             Diagnostic::ReservedCategory { .. } => "reserved_category",
             Diagnostic::CategoryEmpty => "category_empty",
+            Diagnostic::CategoryNotCanonical { .. } => "category_not_canonical",
             Diagnostic::SeverityVocabulary { .. } => "severity_vocabulary",
             Diagnostic::EmptyName => "empty_name",
+            Diagnostic::NameTooLong { .. } => "name_too_long",
+            Diagnostic::NameControlChar => "name_control_char",
             Diagnostic::EmptyDescription => "empty_description",
+            Diagnostic::DescriptionTooLong { .. } => "description_too_long",
+            Diagnostic::DescriptionControlChar => "description_control_char",
+            Diagnostic::SortOrderOutOfRange { .. } => "sort_order_out_of_range",
             Diagnostic::CveIdFormat { .. } => "cve_id_format",
             Diagnostic::ReferenceScheme { .. } => "reference_scheme",
             Diagnostic::AdvisoryTooLarge { .. } => "advisory_too_large",
             Diagnostic::SourceNoteTooLong { .. } => "source_note_too_long",
+            Diagnostic::SourceNoteNotCanonical => "source_note_not_canonical",
+            Diagnostic::AdvisoryRequired { .. } => "advisory_required",
+            Diagnostic::CveIdsEmpty { .. } => "cve_ids_empty",
             Diagnostic::SeedDuplicate { .. } => "seed_duplicate",
         }
     }
@@ -306,6 +362,11 @@ impl Diagnostic {
                 "A rule needs a category — the consumer rejects empty \
                 identifiers and the feed convention is one category per rule."
             }
+            "category_not_canonical" => {
+                "The consumer lowercases + trims the category and then \
+                requires `[a-z0-9_-]` bytes; a non-canonical category is refused by the \
+                consumer outright and design §3.4 rule 2 requires canonical signed bytes."
+            }
             "severity_vocabulary" => {
                 "Feed rules publish only `critical` (KEV or CVSS \
                 >= 9.0) or `warning`; the consumer vocabulary's `info` is not a producer \
@@ -315,9 +376,30 @@ impl Diagnostic {
                 "A rule needs a human-readable name for the operator-facing \
                 catalog and release notes."
             }
+            "name_too_long" => {
+                "The rule name exceeds the consumer's 128-byte ceiling \
+                (canonicalize_rule refuses the whole bundle)."
+            }
+            "name_control_char" => {
+                "The rule name carries a control character — the \
+                consumer's canonicalization refuses it."
+            }
             "empty_description" => {
                 "A rule needs a description stating what exploit \
                 variant the literal detects (honest capability statement, design §5)."
+            }
+            "description_too_long" => {
+                "The description exceeds the consumer's 512-byte \
+                ceiling (canonicalize_rule refuses the whole bundle)."
+            }
+            "description_control_char" => {
+                "The description carries a control character — the \
+                consumer's canonicalization refuses it."
+            }
+            "sort_order_out_of_range" => {
+                "The consumer clamps sort_order into \
+                [1_000_000, 1_999_999]; a value outside means the signed bytes would \
+                differ from the stored rule (§3.4 rule 2) — publish the final value."
             }
             "cve_id_format" => {
                 "The consumer does not case-normalize advisory CVE ids; \
@@ -334,6 +416,20 @@ impl Diagnostic {
             "source_note_too_long" => {
                 "The advisory source note exceeds the consumer's \
                 256-byte ceiling."
+            }
+            "source_note_not_canonical" => {
+                "The consumer trims source_note and rejects control \
+                characters; the signed bytes must already be canonical (§3.4 rule 2)."
+            }
+            "advisory_required" => {
+                "Every vp-cve-* rule must carry an advisory: the \
+                consumer metadata worker activates only on feed rules whose advisory \
+                carries CVE ids (design §7 L4) — an advisory-less CVE rule is a \
+                self-inflicted dormant feature."
+            }
+            "cve_ids_empty" => {
+                "The advisory carries no CVE ids — the metadata merge \
+                stays dormant (design §7 L4). CVE-based rules always publish their ids."
             }
             "seed_duplicate" => {
                 "The (pattern_type, pattern) pair already exists as a \
@@ -395,6 +491,12 @@ impl std::fmt::Display for Diagnostic {
                 )
             }
             Diagnostic::CategoryEmpty => write!(formatter, "category is empty"),
+            Diagnostic::CategoryNotCanonical { category } => {
+                write!(
+                    formatter,
+                    "category `{category}` is not canonical lowercase `[a-z0-9_-]`"
+                )
+            }
             Diagnostic::SeverityVocabulary { severity } => {
                 write!(
                     formatter,
@@ -402,7 +504,31 @@ impl std::fmt::Display for Diagnostic {
                 )
             }
             Diagnostic::EmptyName => write!(formatter, "name is empty"),
+            Diagnostic::NameTooLong { bytes } => {
+                write!(
+                    formatter,
+                    "name is {bytes} bytes (ceiling {NAME_MAX_BYTES})"
+                )
+            }
+            Diagnostic::NameControlChar => {
+                write!(formatter, "name contains a control character")
+            }
             Diagnostic::EmptyDescription => write!(formatter, "description is empty"),
+            Diagnostic::DescriptionTooLong { bytes } => {
+                write!(
+                    formatter,
+                    "description is {bytes} bytes (ceiling {DESCRIPTION_MAX_BYTES})"
+                )
+            }
+            Diagnostic::DescriptionControlChar => {
+                write!(formatter, "description contains a control character")
+            }
+            Diagnostic::SortOrderOutOfRange { sort_order } => {
+                write!(
+                    formatter,
+                    "sort_order {sort_order} is outside [{WAF_FEED_SORT_ORDER_MIN}, {WAF_FEED_SORT_ORDER_MAX}]"
+                )
+            }
             Diagnostic::CveIdFormat { cve } => {
                 write!(
                     formatter,
@@ -423,6 +549,21 @@ impl std::fmt::Display for Diagnostic {
                     formatter,
                     "source_note is {bytes} bytes (ceiling {SOURCE_NOTE_MAX_BYTES})"
                 )
+            }
+            Diagnostic::SourceNoteNotCanonical => {
+                write!(
+                    formatter,
+                    "source_note must be trim-canonical without control characters"
+                )
+            }
+            Diagnostic::AdvisoryRequired { id } => {
+                write!(
+                    formatter,
+                    "rule {id} carries no advisory (metadata worker dormancy)"
+                )
+            }
+            Diagnostic::CveIdsEmpty { id } => {
+                write!(formatter, "rule {id}'s advisory carries no CVE ids")
             }
             Diagnostic::SeedDuplicate {
                 pattern_type,
@@ -556,10 +697,26 @@ pub fn lint_rule(rule: &WafFeedRule) -> Vec<Diagnostic> {
     let category = rule.category.trim().to_ascii_lowercase();
     if category.is_empty() {
         diagnostics.push(Diagnostic::CategoryEmpty);
-    } else if RESERVED_CATEGORIES.contains(&category.as_str()) {
-        diagnostics.push(Diagnostic::ReservedCategory {
-            category: rule.category.clone(),
-        });
+    } else {
+        // The consumer trims + lowercases the category and then
+        // requires `[a-z0-9_-]` within its 64-byte ceiling; the signed
+        // bytes must already BE that canonical spelling (§3.4 rule 2).
+        if rule.category.trim() != rule.category
+            || category != rule.category
+            || category.len() > CATEGORY_MAX_BYTES
+            || !category.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-'
+            })
+        {
+            diagnostics.push(Diagnostic::CategoryNotCanonical {
+                category: rule.category.clone(),
+            });
+        }
+        if RESERVED_CATEGORIES.contains(&category.as_str()) {
+            diagnostics.push(Diagnostic::ReservedCategory {
+                category: rule.category.clone(),
+            });
+        }
     }
 
     if rule.severity != "critical" && rule.severity != "warning" {
@@ -571,11 +728,52 @@ pub fn lint_rule(rule: &WafFeedRule) -> Vec<Diagnostic> {
     if rule.name.trim().is_empty() {
         diagnostics.push(Diagnostic::EmptyName);
     }
+    let name_bytes = rule.name.len();
+    if name_bytes > NAME_MAX_BYTES {
+        diagnostics.push(Diagnostic::NameTooLong { bytes: name_bytes });
+    }
+    if rule.name.chars().any(|character| character.is_control()) {
+        diagnostics.push(Diagnostic::NameControlChar);
+    }
     if rule.description.trim().is_empty() {
         diagnostics.push(Diagnostic::EmptyDescription);
     }
+    let description_bytes = rule.description.len();
+    if description_bytes > DESCRIPTION_MAX_BYTES {
+        diagnostics.push(Diagnostic::DescriptionTooLong {
+            bytes: description_bytes,
+        });
+    }
+    if rule
+        .description
+        .chars()
+        .any(|character| character.is_control())
+    {
+        diagnostics.push(Diagnostic::DescriptionControlChar);
+    }
 
-    if let Some(advisory) = &rule.advisory {
+    if !(WAF_FEED_SORT_ORDER_MIN..=WAF_FEED_SORT_ORDER_MAX).contains(&rule.sort_order) {
+        diagnostics.push(Diagnostic::SortOrderOutOfRange {
+            sort_order: rule.sort_order,
+        });
+    }
+
+    // §7 L4: a CVE rule without an advisory (or with an id-less
+    // advisory) leaves the consumer metadata merge dormant — the
+    // requirement rides the id namespace every feed rule carries.
+    if rule.id.starts_with("vp-cve-") {
+        match &rule.advisory {
+            None => diagnostics.push(Diagnostic::AdvisoryRequired {
+                id: rule.id.clone(),
+            }),
+            Some(advisory) if advisory.cve_ids.is_empty() => {
+                diagnostics.push(Diagnostic::CveIdsEmpty {
+                    id: rule.id.clone(),
+                });
+            }
+            Some(advisory) => diagnostics.extend(lint_advisory(advisory)),
+        }
+    } else if let Some(advisory) = &rule.advisory {
         diagnostics.extend(lint_advisory(advisory));
     }
     diagnostics
@@ -611,6 +809,16 @@ pub fn lint_advisory(advisory: &WafFeedAdvisory) -> Vec<Diagnostic> {
     let note_bytes = advisory.source_note.len();
     if note_bytes > SOURCE_NOTE_MAX_BYTES {
         diagnostics.push(Diagnostic::SourceNoteTooLong { bytes: note_bytes });
+    }
+    // The consumer trims source_note and refuses control characters;
+    // the signed bytes must already be canonical (§3.4 rule 2).
+    if advisory.source_note.trim() != advisory.source_note
+        || advisory
+            .source_note
+            .chars()
+            .any(|character| character.is_control())
+    {
+        diagnostics.push(Diagnostic::SourceNoteNotCanonical);
     }
     diagnostics
 }
@@ -649,14 +857,113 @@ mod tests {
             pattern: "wp-content/plugins/elementor/".to_owned(),
             severity: "warning".to_owned(),
             description: "Detects the Elementor upload-path traversal variant.".to_owned(),
-            sort_order: 0,
-            advisory: None,
+            sort_order: 1_000_000,
+            advisory: Some(WafFeedAdvisory {
+                cve_ids: vec!["CVE-2024-12345".to_owned()],
+                cvss: None,
+                affected: None,
+                references: Vec::new(),
+                source_note: String::new(),
+            }),
         }
     }
 
     #[test]
     fn base_rule_is_clean_and_advisory_checks_pass() {
         assert!(lint_rule(&base_rule()).is_empty());
+    }
+
+    #[test]
+    fn c_p2_1_advisory_is_required_for_cve_rules() {
+        // §7 L4 (M3): an advisory-less vp-cve-* rule is refused, and so
+        // is an advisory shell with no ids.
+        let mut rule = base_rule();
+        rule.advisory = None;
+        assert_eq!(
+            lint_rule(&rule),
+            vec![Diagnostic::AdvisoryRequired {
+                id: "vp-cve-2024-12345".to_owned()
+            }]
+        );
+        let mut rule = base_rule();
+        rule.advisory = Some(WafFeedAdvisory {
+            cve_ids: Vec::new(),
+            cvss: None,
+            affected: None,
+            references: Vec::new(),
+            source_note: String::new(),
+        });
+        assert_eq!(
+            lint_rule(&rule),
+            vec![Diagnostic::CveIdsEmpty {
+                id: "vp-cve-2024-12345".to_owned()
+            }]
+        );
+    }
+
+    #[test]
+    fn c_p2_1_consumer_canonicalization_contract_is_mirrored() {
+        // M4: category canonical spelling + charset, name/description
+        // ceilings and control characters, sort_order window,
+        // source_note canonical spelling — the consumer refuses the
+        // WHOLE bundle over any of these, so the lint refuses the rule.
+        let mut rule = base_rule();
+        rule.category = "CVE Virtual Patch".to_owned();
+        assert_eq!(
+            lint_rule(&rule),
+            vec![Diagnostic::CategoryNotCanonical {
+                category: "CVE Virtual Patch".to_owned()
+            }]
+        );
+
+        let mut rule = base_rule();
+        rule.category = "cve virtual patch!".to_owned();
+        assert!(
+            lint_rule(&rule).contains(&Diagnostic::CategoryNotCanonical {
+                category: "cve virtual patch!".to_owned()
+            })
+        );
+
+        let mut rule = base_rule();
+        rule.name = "x".repeat(129);
+        assert_eq!(
+            lint_rule(&rule),
+            vec![Diagnostic::NameTooLong { bytes: 129 }]
+        );
+
+        let mut rule = base_rule();
+        rule.name = "traversal\u{7}name".to_owned();
+        assert!(lint_rule(&rule).contains(&Diagnostic::NameControlChar));
+
+        let mut rule = base_rule();
+        rule.description = "x".repeat(513);
+        assert_eq!(
+            lint_rule(&rule),
+            vec![Diagnostic::DescriptionTooLong { bytes: 513 }]
+        );
+
+        let mut rule = base_rule();
+        rule.description = "detects\u{7}traversal".to_owned();
+        assert!(lint_rule(&rule).contains(&Diagnostic::DescriptionControlChar));
+
+        for order in [999_999, 2_000_000] {
+            let mut rule = base_rule();
+            rule.sort_order = order;
+            assert!(
+                lint_rule(&rule).contains(&Diagnostic::SortOrderOutOfRange { sort_order: order }),
+                "sort_order {order} must refuse"
+            );
+        }
+
+        let mut rule = base_rule();
+        rule.advisory = Some(WafFeedAdvisory {
+            cve_ids: vec!["CVE-2024-12345".to_owned()],
+            cvss: None,
+            affected: None,
+            references: Vec::new(),
+            source_note: " padded ".to_owned(),
+        });
+        assert_eq!(lint_rule(&rule), vec![Diagnostic::SourceNoteNotCanonical]);
     }
 
     #[test]

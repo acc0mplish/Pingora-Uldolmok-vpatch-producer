@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/grpc-stream.response", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05b_runtime_and_streams.sh", "body": "side-effect=once"}
+{"method": "POST", "path": "/api/v1/items", "query": "", "user_agent": "", "source": "synthetic (e2e-shape)", "body": "{\"name\":\"sample-1\",\"enabled\":true}"}

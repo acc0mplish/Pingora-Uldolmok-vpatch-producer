@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/proxy-hosts/1/clone", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05b_runtime_and_streams.sh", "body": "{\"hostname\":\"clone.pool.test\"}"}
+{"method": "POST", "path": "/api/v1/notes", "query": "", "user_agent": "", "source": "synthetic (e2e-shape)", "body": "{\"title\":\"weekly note\"}"}

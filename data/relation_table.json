@@ -6,7 +6,7 @@
     "wp-file-manager"
   ],
   "entries": {
-    "fortinet:fortios": "/login",
+    "fortinet:fortios": "/remote/logincheck",
     "microsoft:exchange_server": "/ews/",
     "vmware:vcenter": "/sdk/"
   }

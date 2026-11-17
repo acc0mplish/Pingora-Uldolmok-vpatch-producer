@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/certificates", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01_auth_and_certificates.sh", "body": "1"}
+{"method": "GET", "path": "/api/v1/tasks", "query": "state=open&limit=50", "user_agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/132.0", "source": "synthetic (e2e-shape)"}

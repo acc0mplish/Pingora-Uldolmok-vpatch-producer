@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/proxy-hosts/1/health-history", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05b_runtime_and_streams.sh", "body": "side-effect=once"}
+{"method": "POST", "path": "/form/submit", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)", "body": "field=1&other=2"}

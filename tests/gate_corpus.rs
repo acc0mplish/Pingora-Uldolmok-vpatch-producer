@@ -38,6 +38,18 @@ fn request(method: &str, path: &str, query: &str, user_agent: &str) -> CorpusReq
     }
 }
 
+fn request_with_body(
+    method: &str,
+    path: &str,
+    query: &str,
+    user_agent: &str,
+    body: &str,
+) -> CorpusRequest {
+    let mut request = request(method, path, query, user_agent);
+    request.body = Some(body.to_owned());
+    request
+}
+
 fn honest_benign(index: usize) -> CorpusRequest {
     let paths = [
         "/api/v1/hosts",
@@ -65,6 +77,8 @@ fn fill_benign(root: &std::path::Path, count: usize) {
 }
 
 fn write_rule(root: &std::path::Path, id: &str, pattern_type: &str, pattern: &str) {
+    // M3/M4-clean fixture: advisory with CVE ids present (§7 L4) and
+    // sort_order inside the consumer's feed window.
     let rule = serde_json::json!({
         "id": id,
         "name": "Fixture rule",
@@ -73,13 +87,20 @@ fn write_rule(root: &std::path::Path, id: &str, pattern_type: &str, pattern: &st
         "pattern": pattern,
         "severity": "warning",
         "description": "Fixture rule for the corpus gate test.",
-        "sort_order": 0
+        "sort_order": 1_000_000,
+        "advisory": {"cve_ids": [cve_of(id)]}
     });
     std::fs::write(
         root.join(format!("rules/{id}.json")),
         serde_json::to_vec_pretty(&rule).unwrap(),
     )
     .expect("write rule");
+}
+
+/// The canonical CVE id a fixture rule id encodes
+/// (`vp-cve-2099-00001` → `CVE-2099-00001`).
+fn cve_of(id: &str) -> String {
+    format!("CVE-{}", &id["vp-cve-".len()..])
 }
 
 #[test]
@@ -308,10 +329,113 @@ fn c_p2_2_approvable_candidate_lint_failures_are_warnings_that_fail_the_exit() {
 }
 
 #[test]
+fn an_unparsable_exploit_sample_is_named_not_called_missing() {
+    // L1: a PRESENT but broken sample is a different failure from an
+    // absent one — the file is named.
+    let root = temp_tree("unparsable-exploit");
+    fill_benign(&root, BENIGN_MIN);
+    write_rule(&root, "vp-cve-2099-00005", "request_uri", "wp-config.php");
+    std::fs::write(root.join("corpus/exploits/vp-cve-2099-00005.json"), "{oops").unwrap();
+    let report = run_gate(&root);
+    assert_eq!(
+        report.corpus_diagnostics,
+        vec![CorpusDiagnostic::ExploitSampleUnparsable {
+            rule_id: "vp-cve-2099-00005".to_owned(),
+            file: "corpus/exploits/vp-cve-2099-00005.json".to_owned(),
+        }],
+        "the unparsable sample is distinguished from a missing one"
+    );
+}
+
+#[test]
+fn an_unparsable_candidate_file_is_named_not_skipped() {
+    // L2: a candidates/*.json file that does not parse is reported —
+    // its approvable candidates silently escaping qualification is
+    // exactly the gap the file naming closes.
+    let root = temp_tree("unparsable-candidate");
+    fill_benign(&root, BENIGN_MIN);
+    std::fs::write(root.join("candidates/broken.json"), "not candidates").unwrap();
+    let report = run_gate(&root);
+    assert!(
+        report
+            .corpus_diagnostics
+            .contains(&CorpusDiagnostic::CandidateFileUnparsable {
+                file: "candidates/broken.json".to_owned()
+            }),
+        "the unparsable candidate file is named: {:?}",
+        report.corpus_diagnostics
+    );
+    assert!(!report.is_green());
+}
+
+#[test]
+fn an_oversized_exploit_body_is_a_no_match_like_the_consumer() {
+    // M2: the consumer's body phase answers Oversize before any rule
+    // comparison past 1 MiB — an oversized sample must be a NO-MATCH
+    // here too, or the sample would prove detection duty the consumer
+    // cannot deliver. The same body just under the ceiling matches.
+    let pattern = "union select password";
+    let under = format!("x=1 {} y=2", pattern);
+    let forms = RequestForms::build(&request_with_body("POST", "/form", "", "ua", &under));
+    assert!(forms.matches(PatternType::RequestBody, pattern));
+
+    let mut oversized = request_with_body("POST", "/form", "", "ua", &under);
+    let padding = "a".repeat(1024 * 1024 + 1000 - oversized.body.as_ref().unwrap().len());
+    oversized.body = Some(format!("{}{}", oversized.body.unwrap(), padding));
+    assert!(oversized.body.as_ref().unwrap().len() > 1024 * 1024);
+    assert!(
+        oversized.body.as_ref().unwrap().contains(pattern),
+        "fixture sanity: the oversized body still carries the pattern"
+    );
+    assert!(
+        !RequestForms::build(&oversized).matches(PatternType::RequestBody, pattern),
+        "past the inspection ceiling the consumer never matches"
+    );
+
+    // And the full gate refuses the oversized sample as no-match.
+    let root = temp_tree("oversize-exploit");
+    fill_benign(&root, BENIGN_MIN);
+    let rule = serde_json::json!({
+        "id": "vp-cve-2099-00006",
+        "name": "Oversize body fixture",
+        "category": "cve-virtual-patch",
+        "pattern_type": "request_body",
+        "pattern": pattern,
+        "severity": "warning",
+        "description": "Fixture rule for the oversized body mirror.",
+        "sort_order": 1_000_000,
+        "advisory": {"cve_ids": ["CVE-2099-00006"]}
+    });
+    std::fs::write(
+        root.join("rules/vp-cve-2099-00006.json"),
+        serde_json::to_vec_pretty(&rule).unwrap(),
+    )
+    .unwrap();
+    write_request(
+        &root.join("corpus/exploits/vp-cve-2099-00006.json"),
+        &oversized,
+    );
+    let report = run_gate(&root);
+    assert!(
+        report
+            .corpus_diagnostics
+            .contains(&CorpusDiagnostic::ExploitSampleNoMatch {
+                rule_id: "vp-cve-2099-00006".to_owned(),
+                file: "corpus/exploits/vp-cve-2099-00006.json".to_owned(),
+            }),
+        "the oversized sample cannot evidence detection duty: {:?}",
+        report.corpus_diagnostics
+    );
+}
+
+#[test]
 fn the_committed_corpus_is_honest_and_meets_the_floor() {
     // The landing gate over the REAL tree: zero rules (no curation PR
     // has landed yet), the committed benign corpus at or above the
-    // floor, everything green.
+    // floor, everything green. The honesty seal is enforced INSIDE
+    // run_gate (L3): green here already proves no committed benign
+    // request contains a consumer seed pattern in any match form —
+    // a violation would surface as `benign_seed_violation`.
     let report = run_gate(std::path::Path::new("."));
     assert!(
         report.is_green(),
@@ -320,40 +444,22 @@ fn the_committed_corpus_is_honest_and_meets_the_floor() {
         report.corpus_diagnostics
     );
     assert!(
+        !report
+            .corpus_diagnostics
+            .contains(&CorpusDiagnostic::BenignCorpusTooSmall {
+                count: report.benign_count
+            }),
+        "the committed corpus meets the design §5 floor"
+    );
+    assert!(
         report.benign_count >= BENIGN_MIN,
         "the committed corpus meets the design §5 floor (L3)"
     );
-
-    // Honesty seal: no benign request may contain a consumer seed
-    // pattern in ANY of its match forms — the benign corpus must not
-    // contain the very strings the seeds model.
-    let mut benign_files: Vec<PathBuf> = std::fs::read_dir("corpus/benign")
-        .expect("the committed corpus exists")
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().and_then(|extension| extension.to_str()) == Some("json"))
-        .collect();
-    benign_files.sort();
-    assert!(benign_files.len() >= BENIGN_MIN);
-    for path in &benign_files {
-        let bytes = std::fs::read(path).expect("read benign file");
-        let request: CorpusRequest =
-            serde_json::from_slice(&bytes).expect("every committed benign file parses");
-        let forms = RequestForms::build(&request);
-        for (seed_type, seed_pattern) in waf_bundle_encoder::seed_blocklist() {
-            let pattern_type = match seed_type.as_str() {
-                "query_string" => PatternType::QueryString,
-                "request_uri" => PatternType::RequestUri,
-                "user_agent" => PatternType::UserAgent,
-                "request_method" => PatternType::RequestMethod,
-                "request_body" => PatternType::RequestBody,
-                other => panic!("unknown seed pattern_type {other:?}"),
-            };
-            assert!(
-                !forms.matches(pattern_type, seed_pattern),
-                "benign file {} contains seed ({seed_type}, `{seed_pattern}`) — corpus honesty violated",
-                path.display()
-            );
-        }
-    }
+    assert!(
+        !report
+            .corpus_diagnostics
+            .iter()
+            .any(|diagnostic| matches!(diagnostic, CorpusDiagnostic::BenignSeedViolation { .. })),
+        "the gate-enforced honesty seal is green over the committed corpus"
+    );
 }

@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/var/lib/uldolmok/uldolmok.db", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 28_install_lifecycle.sh"}
+{"method": "POST", "path": "/api/v1/items", "query": "", "user_agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/132.0", "source": "synthetic (e2e-shape)", "body": "{\"name\":\"sample-1\",\"enabled\":true}"}

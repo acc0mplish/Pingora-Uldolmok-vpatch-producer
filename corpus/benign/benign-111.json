@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/acme-orders/1", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01b_acme_certificates.sh", "body": "{\\"}
+{"method": "GET", "path": "/api/v1/export", "query": "format=csv&page=1", "user_agent": "", "source": "synthetic (e2e-shape)"}

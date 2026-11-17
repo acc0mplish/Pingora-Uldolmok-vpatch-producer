@@ -1,1 +1,1 @@
-{"method": "PUT", "path": "/api/v1/backup/archive", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05_backup_and_runtime.sh", "body": "{\"enabled\":true,\"destination\":\"relative/archive\"}"}
+{"method": "POST", "path": "/api/v1/archive", "query": "", "user_agent": "Mozilla/5.0 (Macintosh) Safari/17.0", "source": "synthetic (e2e-shape)", "body": "{\"enabled\":true,\"retention_days\":30}"}

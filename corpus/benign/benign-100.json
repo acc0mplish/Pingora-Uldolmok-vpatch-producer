@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/auth/api-tokens", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01_auth_and_certificates.sh", "body": "{\"name\":\"E2E never ttl token\",\"scopes\":[\"proxy:read\"],\"expires_in_days\":0}"}
+{"method": "GET", "path": "/api/v1/items", "query": "sort=name&order=asc", "user_agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/132.0", "source": "synthetic (e2e-shape)"}

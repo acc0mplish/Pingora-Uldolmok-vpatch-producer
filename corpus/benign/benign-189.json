@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/policies", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 35_data_protection_policy.sh"}
+{"method": "POST", "path": "/api/v1/notes", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)", "body": "{\"title\":\"weekly note\"}"}

@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/backups", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05_backup_and_runtime.sh", "body": "{}"}
+{"method": "POST", "path": "/api/v1/notes", "query": "", "user_agent": "Mozilla/5.0 (Windows NT 10.0) Firefox/132.0", "source": "synthetic (e2e-shape)", "body": "{\"title\":\"weekly note\"}"}

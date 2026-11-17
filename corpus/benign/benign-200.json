@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/api/v1/settings/maintenance-page/posts", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 49_maintenance_board.sh"}
+{"method": "PUT", "path": "/api/v1/items/1", "query": "", "user_agent": "curl/8.7.1", "source": "synthetic (e2e-shape)", "body": "{\"description\":\"updated\"}"}

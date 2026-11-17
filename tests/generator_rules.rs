@@ -45,7 +45,7 @@ fn relation_table_maps_plugin_slugs_and_explicit_entries() {
     );
     assert_eq!(
         entrypoint_hint("fortinet:fortios"),
-        Some("/login".to_owned())
+        Some("/remote/logincheck".to_owned())
     );
     // unmapped tokens yield no hint
     assert_eq!(entrypoint_hint("vendorco:unmapped"), None);
@@ -121,7 +121,7 @@ fn kev_pair_tokens_map_with_kev_metadata_provenance() {
     assert_eq!(file.tokens, vec!["fortinet:fortios"]);
     assert_eq!(file.cvss, None);
     assert_eq!(file.candidates.len(), 1);
-    assert_eq!(file.candidates[0].literal, "/login");
+    assert_eq!(file.candidates[0].literal, "/remote/logincheck");
     assert_eq!(
         file.candidates[0].provenance,
         Some(Provenance::KevMetadata {

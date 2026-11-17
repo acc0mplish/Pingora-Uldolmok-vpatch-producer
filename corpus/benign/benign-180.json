@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/api/v1/logs/access/client-summaries", "query": "limit=10", "user_agent": "curl/8.7.1", "source": "e2e scenario 23_identity_ingress.sh", "body": "\\r"}
+{"method": "POST", "path": "/api/v1/notifications/test", "query": "", "user_agent": "curl/8.7.1", "source": "synthetic (e2e-shape)", "body": "{\"target\":\"#ops\",\"channel\":\"slack\"}"}

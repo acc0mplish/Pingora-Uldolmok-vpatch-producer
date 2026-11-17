@@ -1,1 +1,1 @@
-{"method": "GET", "path": "/l4-pass.body", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 48_turnstile_real_provider.sh"}
+{"method": "POST", "path": "/api/v1/notifications/test", "query": "", "user_agent": "", "source": "synthetic (e2e-shape)", "body": "{\"target\":\"#ops\",\"channel\":\"slack\"}"}

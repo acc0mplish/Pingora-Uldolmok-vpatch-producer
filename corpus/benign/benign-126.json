@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/banned-ips", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 03_security_and_streams.sh", "body": "{\"cidr\":\"::1/128\",\"reason\":\"l4-bypass\"}"}
+{"method": "GET", "path": "/api/v1/search", "query": "q=report+notes", "user_agent": "", "source": "synthetic (e2e-shape)"}

@@ -1,1 +1,1 @@
-{"method": "POST", "path": "/api/v1/security/geo/global", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 03_security_and_streams.sh", "body": "{\"blocked_providers\":[\"aws\"],\"challenge_mode\":false,\"allow_search_bots\":false}"}
+{"method": "HEAD", "path": "/static/app.main.js", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "synthetic (e2e-shape)"}
