@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/proxy-hosts", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 06_tls_restore_and_legacy.sh"}

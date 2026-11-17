@@ -1,0 +1,1 @@
+{"method": "PUT", "path": "/api/v1/backup/archive", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05_backup_and_runtime.sh", "body": "{\"enabled\":false,\"transport\":\"s3\",\"provider_lifecycle\":true,\"key_rotation_days\":180,\"s3_endpoint\":\"http://127.0.0.1:9\",\"s3_bucket\":\"e2e-backups\",\"s3_region\":\"us-east-1\",\"s3_prefix\":\"archives\"}"}

@@ -167,6 +167,12 @@ pub struct CorpusRequest {
     pub user_agent: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
+    /// P-P2 benign-corpus provenance: where the request shape came from
+    /// (an e2e scenario script, the ops load driver, or a handwritten
+    /// representative). Annotation only — the matcher never reads it,
+    /// and absent on exploit samples (their file NAME is the rule id).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// Canonicalizes a CVE id to the producer's only accepted spelling:

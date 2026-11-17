@@ -155,9 +155,14 @@ fn corpus_request_roundtrips_with_and_without_a_body() {
         query: "a=1".to_owned(),
         user_agent: "probe/1.0".to_owned(),
         body: Some("payload=1".to_owned()),
+        source: Some("e2e scenario".to_owned()),
     };
     let serialized = serde_json::to_string(&with_body).expect("serializes");
     assert!(serialized.contains(r#""body":"payload=1""#));
+    assert!(
+        serialized.contains(r#""source":"e2e scenario""#),
+        "the P-P2 source annotation serializes when present"
+    );
     let parsed: CorpusRequest = serde_json::from_str(&serialized).expect("parses back");
     assert_eq!(parsed, with_body);
 
@@ -166,9 +171,11 @@ fn corpus_request_roundtrips_with_and_without_a_body() {
     )
     .expect("a body-less request deserializes");
     assert_eq!(without_body.body, None);
+    assert_eq!(without_body.source, None);
     assert_eq!(
         serde_json::to_string(&without_body).unwrap(),
-        r#"{"method":"GET","path":"/ews/","query":"","user_agent":"probe/1.0"}"#
+        r#"{"method":"GET","path":"/ews/","query":"","user_agent":"probe/1.0"}"#,
+        "an absent source key stays absent on the wire"
     );
 }
 

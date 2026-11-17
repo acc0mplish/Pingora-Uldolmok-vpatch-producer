@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/maintenance/window", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "handwritten representative", "body": "{\"start\":\"2026-11-18T02:00:00Z\",\"minutes\":30}"}

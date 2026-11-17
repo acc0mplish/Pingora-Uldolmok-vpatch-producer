@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/.well-known/acme-challenge/x1y2z3", "query": "", "user_agent": "Let's Encrypt validation server 2", "source": "handwritten representative"}

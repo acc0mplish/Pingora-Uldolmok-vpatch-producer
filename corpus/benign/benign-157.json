@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/streams", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 05b_runtime_and_streams.sh", "body": "{\"name\":\"e2e-restart-udp\",\"listen_port\":"}

@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/certificates", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 01_auth_and_certificates.sh", "body": "1"}

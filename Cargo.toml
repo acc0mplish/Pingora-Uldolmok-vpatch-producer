@@ -29,6 +29,16 @@ reqwest = { version = "0.12", default-features = false, features = [
 # CARGO_NET_GIT_FETCH_WITH_CLI=1 (the main repo is private; the https
 # credential helper path is the verified transport).
 waf-bundle-encoder = { git = "https://github.com/acc0mplish/Pingora-Uldolmok.git", rev = "8cd76d57cb44710ad1d60291451568708e15eaf6" }
+# P-P2 gate matcher fidelity (claim 8): the gate matches corpus requests
+# through the consumer's OWN public form builder (`waf_match_forms`,
+# re-exported from the private `waf_rules` module), pinned to the same
+# rev as the codec so form semantics cannot drift between gate and
+# consumer. `waf_unicode_forms` stays private upstream, so the
+# user-agent/method raw+NFKC pair is composed here from the same
+# `unicode-normalization` 0.1 the consumer uses (Cargo unifies both to
+# one 0.1.x in the lock).
+config-model = { git = "https://github.com/acc0mplish/Pingora-Uldolmok.git", rev = "8cd76d57cb44710ad1d60291451568708e15eaf6" }
+unicode-normalization = "0.1"
 
 [lints.rust]
 unsafe_code = "deny"

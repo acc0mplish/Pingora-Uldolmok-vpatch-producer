@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/upstream-timeout.body", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 18_upstream_failure_pages.sh"}

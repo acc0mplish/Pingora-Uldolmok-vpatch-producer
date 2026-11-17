@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/invoices", "query": "min_amount=0&max_amount=1000000&currency=KRW", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "handwritten representative"}

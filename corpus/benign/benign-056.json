@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/login", "query": "", "user_agent": "Mozilla/5.0 (Macintosh) Safari/17.0", "source": "handwritten representative", "body": "username=opsuser&password=s3cret-placeholder"}

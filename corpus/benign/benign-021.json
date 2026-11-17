@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/audit-log", "query": "since=2026-11-01T00:00:00Z&limit=100", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "handwritten representative"}

@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/stats/hourly", "query": "date=2026-11-17&tz=Asia/Seoul", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "handwritten representative"}

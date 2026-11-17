@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/stats", "query": "year=2026&month=11&day=17", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "handwritten representative"}

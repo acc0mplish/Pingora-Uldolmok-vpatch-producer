@@ -1,0 +1,1 @@
+{"method": "PUT", "path": "/api/v1/hosts/42", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "handwritten representative", "body": "{\"description\":\"seoul edge\"}"}

@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/reporting/jobs/1", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 41_report_summary.sh"}

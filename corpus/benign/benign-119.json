@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/auth/api-tokens", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 02_ddns_notifications_and_access.sh", "body": "{\"name\":\"E2E proxy-only host log token\",\"scopes\":[\"proxy:read\"],\"expires_in_days\":1}"}

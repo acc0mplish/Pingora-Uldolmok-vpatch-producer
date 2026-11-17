@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/security/antibot/policy", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 48_turnstile_real_provider.sh"}

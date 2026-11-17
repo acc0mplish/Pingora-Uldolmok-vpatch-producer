@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/logs/access/client-summaries", "query": "client=198.51.100.23", "user_agent": "curl/8.7.1", "source": "e2e scenario 23_identity_ingress.sh", "body": "\\r"}

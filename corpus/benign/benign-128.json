@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/proxy-hosts", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 03_security_and_streams.sh", "body": "{\"hostname\":\"uri-invalid.test\",\"upstream\":{\"scheme\":\"http\",\"host\":\"127.0.0.1\",\"port\":"}

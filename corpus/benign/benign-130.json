@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/redirect-hosts", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 03_security_and_streams.sh", "body": "{\"domain_names\":[\"policy-redirect.e2e.test\"],\"forward_scheme\":\"https\",\"forward_domain_name\":\"target.example.test\",\"redirect_code\":302,\"enabled\":true}"}

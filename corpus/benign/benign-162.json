@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/acme-orders", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 06_tls_restore_and_legacy.sh", "body": "{\"name\":\"viewer-denied\",\"event_kind\":\"rate_limit\",\"threshold\":2,\"window_seconds\":60,\"ban_duration_seconds\":60}"}

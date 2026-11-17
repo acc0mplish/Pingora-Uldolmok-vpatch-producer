@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/health/live", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 33_vault_rotation_log_guard.sh", "body": " "}

@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/settings/maintenance-page", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 20_maintenance_gate.sh"}

@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/access-lists", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 02_ddns_notifications_and_access.sh", "body": "{\"name\":\"office-only\",\"policy\":{\"rules\":[{\"action\":\"deny\",\"address\":{\"cidr\":\"203.0.113.0/24\"}},{\"action\":\"allow\",\"address\":\"all\"}]}}"}

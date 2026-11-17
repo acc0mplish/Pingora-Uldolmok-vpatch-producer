@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/ha45-mark-freeze", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 45_ha_control_plane_failover.sh"}

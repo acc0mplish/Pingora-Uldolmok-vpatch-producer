@@ -1,0 +1,1 @@
+{"method": "POST", "path": "/api/v1/hosts", "query": "", "user_agent": "Mozilla/5.0 ops-console/2.1", "source": "handwritten representative", "body": "{\"name\":\"edge-02\",\"address\":\"10.0.0.8\",\"port\":8443,\"tls\":true}"}

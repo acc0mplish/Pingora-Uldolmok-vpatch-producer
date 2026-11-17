@@ -1,0 +1,1 @@
+{"method": "GET", "path": "/api/v1/logs/audit", "query": "", "user_agent": "curl/8.7.1", "source": "e2e scenario 09_external_certificate_watch.sh"}
