@@ -381,10 +381,9 @@ jobs:
           ).stdout.strip()
           subprocess.run(
               ["gh", "api", "-X", "PUT", f"repos/{repo}/contents/state.json",
-               "-f", "message",
-               f"chore(state): bump to sequence {sequence} ({payload['version']}) after release uvpb-seq-{sequence}",
-               "-f", "content", base64.b64encode(content.encode()).decode(),
-               "-f", "sha", meta],
+               "-f", f"message=chore(state): bump to sequence {sequence} ({payload['version']}) after release uvpb-seq-{sequence}",
+               "-f", f"content={base64.b64encode(content.encode()).decode()}",
+               "-f", f"sha={meta}"],
               check=True,
           )
           print("state bump commit pushed: sequence", sequence)
