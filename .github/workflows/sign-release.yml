@@ -294,15 +294,25 @@ jobs:
             *) echo "dist releases API returned HTTP $code: refusing" >&2; exit 1 ;;
           esac
           if [ -n "$tag" ]; then
-            previous="${tag#uvpb-seq-}"
+            # The published BYTES are the source of truth for the sequence,
+            # not the tag: drill-era releases carry version-label tags
+            # (2026-11-17.N) while CI releases carry uvpb-seq-<N>. Read the
+            # sequence from the latest uvpb-bundle.json asset instead.
+            asset_url="$(python3 -c 'import json; d=json.load(open("staging/latest.json")); a=[x for x in d.get("assets",[]) if x.get("name")=="uvpb-bundle.json"]; print(a[0]["browser_download_url"] if a else "")')"
+            if [ -z "$asset_url" ]; then
+              echo "latest dist release $tag has no uvpb-bundle.json asset: refusing" >&2
+              exit 1
+            fi
+            curl -sSL -o staging/latest-envelope.json "$asset_url"
+            previous="$(python3 -c 'import json,base64; e=json.load(open("staging/latest-envelope.json")); print(json.loads(base64.b64decode(e["payload"]))["sequence"])')"
             case "$previous" in
               ''|*[!0-9]*)
-                echo "latest dist release tag $tag does not follow uvpb-seq-<sequence>" >&2
+                echo "latest dist bundle payload sequence is not numeric: refusing" >&2
                 exit 1
                 ;;
             esac
             if [ "$sequence" -le "$previous" ]; then
-              echo "refusing sequence $sequence: dist latest release $tag already reached $previous" >&2
+              echo "refusing sequence $sequence: dist latest bundle (tag $tag) already reached $previous" >&2
               exit 1
             fi
           fi
