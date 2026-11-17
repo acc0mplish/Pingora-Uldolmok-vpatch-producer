@@ -1,0 +1,11 @@
+# 실행 가능 경로 전부 + 핀/의존 소유 파일 (설계 D3·§8.1 — r3.2)
+* @acc0mplish
+/src/ @acc0mplish
+/.github/workflows/ @acc0mplish
+/Cargo.toml @acc0mplish
+/Cargo.lock @acc0mplish
+/pin.rev @acc0mplish
+/rust-toolchain.toml @acc0mplish
+/rules/ @acc0mplish
+/candidates/ @acc0mplish
+/corpus/ @acc0mplish
