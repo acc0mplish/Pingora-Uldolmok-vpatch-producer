@@ -1,5 +1,5 @@
 {
- "sequence": 1,
- "current_key_id": "0d693930ddccc6b2aa2f495d6ada3223",
- "note": "TEST drill key (local seed /tmp/uvpb-drill \u2014 not production). CI assembly pending."
+ "sequence": 2,
+ "current_key_id": "bed4490644445515f60e1c6cfc919488",
+ "note": "TEST drill keys (rotation rehearsal seq1->2, key change). CI assembly pending."
 }
