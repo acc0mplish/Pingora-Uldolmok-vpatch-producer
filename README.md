@@ -5,7 +5,7 @@ UVPB(Uldolmok Virtual-Patch Bundle) v1 생산자 소스 리포 — 큐레이션�
 - 규범 설계: `Pingora-Uldolmok` 리포 `docs/task-id/i1745-bundle-producer/design.md` (r3.2 FINAL)
 - 형식 스펙 원천: `Pingora-Uldolmok` 리포 `docs/security/virtual-patch-bundle-format.md`
 - 코덱: `Pingora-Uldolmok` 리포 `crates/waf-bundle-encoder` (git 핀 — `pin.rev`가 기대 rev 소유)
-- ****테스트 단계 public** (실전 전환 P-P3 전 private 복귀 권장 — 큐레이션 은닉)** — 서명 키 시드·큐레이션 이력 포함. 공개 아티팩트는 dist 리포(`vpatch-dist`)로만 게시된다.
+- ****테스트 단계 public** (실전 전환 P-P3 전 private 복귀 권장 — 큐레이션 은닉)** — 서명 키 시드·큐레이션 이력 포함. 공개 아티팩트는 dist 리포(`Pingora-Uldolmok-vpatch-dist`)로만 게시된다.
 
 ## 구조 (설계 §9 P-P0~P-P4)
 
