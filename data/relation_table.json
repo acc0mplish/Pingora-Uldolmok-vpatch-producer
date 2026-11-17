@@ -1,0 +1,13 @@
+{
+  "comment": "v1 minimal product->entrypoint relation table (design D2 rule 2). 'plugins' holds WordPress plugin slugs; each maps to the /wp-content/plugins/<slug>/ entrypoint. 'entries' holds explicit vendor:product CPE tokens for the highest-frequency server products. Every candidate literal produced from this table is a HINT — a human curator approves each rule (design D2/§7); the table's smallness is deliberate because the corpus gate, not the table, binds candidate quality.",
+  "plugins": [
+    "contact-form-7",
+    "elementor",
+    "wp-file-manager"
+  ],
+  "entries": {
+    "fortinet:fortios": "/login",
+    "microsoft:exchange_server": "/ews/",
+    "vmware:vcenter": "/sdk/"
+  }
+}

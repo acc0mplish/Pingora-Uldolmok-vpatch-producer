@@ -1,0 +1,37 @@
+[package]
+name = "uldolmok-vpatch-pipeline"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "UVPB v1 curation pipeline: KEV/NVD intake and candidate generation (issue #1745 P-P1)"
+
+# The repo root IS the crate (single-crate workspace). The explicit empty
+# workspace table keeps the crate from ever inheriting a parent workspace
+# if the tree is ever cloned deeper.
+[workspace]
+
+[dependencies]
+# Issue #1745 P-P1: intake parses the KEV catalog and NVD CVE API 2.0
+# responses with the minimum the schemas need (design D2 — no full CVE
+# record modeling, the candidate pipeline carries its own narrow types).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Blocking client with rustls only (no openssl system dep); the fetch
+# shape mirrors the consumer metadata worker's whole-request 30 s
+# deadline and 16 MiB ceiling (waf_cve_metadata_worker conventions).
+reqwest = { version = "0.12", default-features = false, features = [
+    "blocking",
+    "rustls-tls",
+] }
+# The UVPB codec, pinned to the same rev `pin.rev` records (the pin seat
+# is the P-P1 workspace contract; the P-P2 gate consumes the crate's
+# `seed_blocklist()`/`publish_gate()` — design D2/§7). Local builds need
+# CARGO_NET_GIT_FETCH_WITH_CLI=1 (the main repo is private; the https
+# credential helper path is the verified transport).
+waf-bundle-encoder = { git = "https://github.com/acc0mplish/Pingora-Uldolmok.git", rev = "8cd76d57cb44710ad1d60291451568708e15eaf6" }
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "deny"

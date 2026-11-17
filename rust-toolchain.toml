@@ -1,0 +1,8 @@
+# Stable-channel pin for the producer pipeline. This file is part of the
+# producer tree the signing job must NOT execute (design D3-H3): it exists
+# so curation/gate builds are reproducible, not as a build orchestration
+# surface.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

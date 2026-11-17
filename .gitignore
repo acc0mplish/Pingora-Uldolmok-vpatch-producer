@@ -1,0 +1,3 @@
+# Cargo build output (never committed; see AGENTS-level lesson on
+# debug artifacts swept into commits by add -A).
+/target/
