@@ -70,7 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           expected="$(tr -d '[:space:]' < pin.rev)"
-          upstream="$(git ls-remote https://github.com/acc0mplish/Pingora-Uldolmok.git refs/heads/main | awk '{print $1}')"
+          upstream="$(git ls-remote "https://x-access-token:${ULDOLMOK_REPO_PAT}@github.com/acc0mplish/Pingora-Uldolmok.git" refs/heads/main 2>/dev/null | awk '{print $1}' || true)"
           if [ -z "$upstream" ]; then
             echo "::warning::could not read upstream main (missing PAT or network); pin comparison skipped"
             exit 0
