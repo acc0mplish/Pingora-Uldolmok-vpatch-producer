@@ -21,5 +21,5 @@ UVPB(Uldolmok Virtual-Patch Bundle) v1 생산자 소스 리포 — 큐레이션�
 1. 읽기 PAT(contents:read)를 secret `ULDOLMOK_REPO_PAT`으로 등록
 2. Ed25519 키 시드 32B를 secret `UVPB_SIGN_SEED`로 등록 (오프라인 원본 보관: 암호화 파일+오프사이트)
 3. environment `signing` 생성·승인자 지정 (2인 규칙)
-4. 기본 브랜치 보호 (직접 push 금지·workflow 편집 관리자 전용)
+4. 기본 브랜치 보호 — **GitHub Pro 필요 실측(403)**: Free 플랜 private 리포는 브랜치 보호·CODEOWNERS 강제 불가. Pro 승격 또는 보상 통제 수용(절차적 2인 규칙·dispatch 전용·키 시드 등록 전까지 무시크릿 창 유지) 중 택일이 P-P3(제네시스 서명) 전제다
 5. 큐레이터 1인 추가 지정 (CODEOWNERS 갱신)
