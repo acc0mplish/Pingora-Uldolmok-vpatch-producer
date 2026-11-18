@@ -1,0 +1,1251 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VPATCH 후보 리뷰</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2733; --ink-soft: #5a6b7d;
+  --line: #d8dfe6; --accent: #0b5cad; --accent-soft: #e3eef9;
+  --ok: #0a7d43; --ok-soft: #e2f4ea; --bad: #b3261e; --bad-soft: #fbe9e7;
+  --warn: #8a5a00; --warn-soft: #fff3d6; --hold: #5e5468; --hold-soft: #efeaf5;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+header {
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 10px 16px; position: sticky; top: 0; z-index: 5;
+}
+header h1 { margin: 0 0 6px; font-size: 17px; }
+header h1 small { color: var(--ink-soft); font-weight: normal; margin-left: 8px; }
+.hrow { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; margin: 3px 0; }
+.hrow b { font-weight: 600; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--accent-soft); color: var(--accent); border: 1px solid transparent; white-space: nowrap; }
+.pill.approved { background: var(--ok-soft); color: var(--ok); }
+.pill.rejected { background: var(--bad-soft); color: var(--bad); }
+.pill.deferred { background: var(--hold-soft); color: var(--hold); }
+.pill.warnbadge { background: var(--warn-soft); color: var(--warn); }
+.pill.kev { background: #1c2733; color: #fff; }
+.pill.critical { background: var(--bad-soft); color: var(--bad); }
+.pill.warning { background: var(--warn-soft); color: var(--warn); }
+.pill.muted { background: #eceff3; color: var(--ink-soft); }
+#saveStatus { color: var(--ink-soft); }
+#persistBadge { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+button {
+  font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.dangerbtn { border-color: var(--bad); color: var(--bad); }
+#filterbar {
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+}
+#filterbar label { display: inline-flex; gap: 4px; align-items: center; color: var(--ink-soft); }
+input[type="text"], input[type="search"], input[type="number"], select, textarea {
+  font: inherit; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--ink);
+}
+input[type="search"] { width: 220px; }
+#notice { padding: 6px 16px; min-height: 20px; color: var(--accent); white-space: pre-wrap; }
+#notice.error { color: var(--bad); }
+main { padding: 8px 16px 60px; }
+.grow { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; }
+.ghead {
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+  width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 12px;
+}
+.ghead:hover { color: var(--accent); }
+.ghead .cve { font-weight: 700; font-family: var(--mono); }
+.ghead .chev { color: var(--ink-soft); width: 14px; display: inline-block; }
+.gbody { border-top: 1px dashed var(--line); padding: 8px 12px 12px; }
+.gmemo { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.gmemo textarea { flex: 1; min-height: 34px; }
+.gbulk { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; color: var(--ink-soft); }
+.crow { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 8px 10px; background: #fcfdfe; }
+.ctop { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.verdicts { display: inline-flex; gap: 8px; align-items: center; padding-right: 8px; border-right: 1px solid var(--line); }
+.verdicts label { display: inline-flex; gap: 3px; align-items: center; cursor: pointer; }
+.literal {
+  font-family: var(--mono); font-size: 13px; background: #eef1f5; border: 1px solid var(--line);
+  border-radius: 6px; padding: 2px 8px; cursor: copy; word-break: break-all; max-width: 640px;
+}
+.literal:hover { border-color: var(--accent); }
+.cprov { margin: 6px 0 2px; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.cprov a { color: var(--accent); word-break: break-all; }
+.cprov code { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+.cform { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; display: grid; gap: 6px; }
+.cform .checks { display: grid; gap: 3px; }
+.cform .checks label { display: flex; gap: 6px; align-items: baseline; }
+.cform .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cform textarea { width: 100%; min-height: 44px; }
+.cform input[type="text"] { flex: 1; min-width: 240px; }
+.flabel { color: var(--ink-soft); font-size: 12px; min-width: 210px; }
+.cnt { font-size: 12px; color: var(--ink-soft); }
+.cnt.over { color: var(--bad); font-weight: 700; }
+.idprev { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+.cstatus { margin-top: 6px; font-size: 12px; min-height: 14px; }
+.cstatus.block { color: var(--bad); }
+.cstatus.invalid { color: var(--warn); }
+#toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  background: #1c2733; color: #fff; padding: 6px 14px; border-radius: 8px; display: none; z-index: 30;
+}
+#modalOverlay {
+  position: fixed; inset: 0; background: rgba(20, 28, 36, 0.45); z-index: 20;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+#modalOverlay[hidden] { display: none; }
+#modalBox {
+  background: var(--panel); border-radius: 10px; min-width: 320px; max-width: 560px;
+  max-height: 80vh; overflow: auto; padding: 16px 18px;
+}
+#modalBox h2 { margin: 0 0 8px; font-size: 15px; }
+#modalBody { white-space: pre-wrap; color: var(--ink); }
+#modalReasonWrap { margin-top: 10px; }
+#modalReasonWrap textarea { width: 100%; min-height: 54px; }
+#modalBtns { margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; }
+.empty { color: var(--ink-soft); padding: 20px 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VPATCH 후보 리뷰 <small id="fpLabel"></small></h1>
+  <div class="hrow" id="progressRow">
+    <b>진행률</b>
+    <span class="pill muted">전체 <span id="pTotal">0</span></span>
+    <span class="pill approved">승인 <span id="pApproved">0</span></span>
+    <span class="pill rejected">기각 <span id="pRejected">0</span></span>
+    <span class="pill deferred">보류 <span id="pDeferred">0</span></span>
+    <span class="pill muted">미판정 <span id="pUndecided">0</span></span>
+  </div>
+  <div class="hrow" id="statRow">
+    <b>통계</b>
+    <span class="pill kev">KEV 그룹 <span id="statKev">0</span>/<span id="statGroups">0</span></span>
+    <span class="pill critical">CVSS 9.0 이상 <span id="statC90">0</span></span>
+    <span class="pill critical">CVSS 9.8 이상 <span id="statC98">0</span></span>
+    <span class="pill muted">poc_reference 후보 <span id="statPoc">0</span></span>
+    <span class="pill muted">nvd_cpe 후보 <span id="statCpe">0</span></span>
+  </div>
+  <div class="hrow" id="actionRow">
+    <button id="btnExport" class="primary">내보내기(JSON 다운로드)</button>
+    <button id="btnCopyJson">JSON 클립보드 복사</button>
+    <button id="btnImport">가져오기(JSON 파일)</button>
+    <input type="file" id="fileInput" accept=".json,application/json" hidden>
+    <button id="btnUndo" disabled>되돌리기</button>
+    <button id="btnCollapseAll">모두 접기</button>
+    <span id="saveStatus">저장: 대기(변경 없음)</span>
+    <span class="pill warnbadge" id="persistBadge" hidden></span>
+  </div>
+</header>
+<div id="filterbar">
+  <label>검색 <input type="search" id="fSearch" placeholder="CVE / literal / token"></label>
+  <label>provenance
+    <select id="fProv">
+      <option value="all">전체</option>
+      <option value="poc_reference">poc_reference</option>
+      <option value="nvd_cpe">nvd_cpe</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="fKev"> KEV만</label>
+  <label>CVSS
+    <select id="fCvssPreset">
+      <option value="0">전체</option>
+      <option value="9.8">9.8 이상</option>
+      <option value="9.0">9.0 이상</option>
+      <option value="7.0">7.0 이상</option>
+      <option value="custom">직접 입력</option>
+    </select>
+  </label>
+  <input type="number" id="fCvssCustom" min="0" max="10" step="0.1" hidden value="0">
+  <label>판정
+    <select id="fVerdict">
+      <option value="all">전체</option>
+      <option value="undecided">미판정</option>
+      <option value="approved">승인</option>
+      <option value="rejected">기각</option>
+      <option value="deferred">보류</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="fHintsOnly"> 경고 힌트 보유만</label>
+  <label>정렬
+    <select id="fSort">
+      <option value="kevcvss">KEV·CVSS 우선</option>
+      <option value="cve">CVE ID순</option>
+    </select>
+  </label>
+  <span class="pill muted">표시 그룹 <span id="shownGroups">0</span></span>
+  <button id="bulkReject" class="dangerbtn" disabled>필터 내 미판정 <span id="bulkN">0</span>건 일괄 기각</button>
+  <button id="bulkDefer" disabled>필터 내 미판정 일괄 보류</button>
+</div>
+<div id="notice"></div>
+<main id="groupList"></main>
+<div id="toast"></div>
+<div id="modalOverlay" hidden>
+  <div id="modalBox">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+    <div id="modalReasonWrap" hidden>
+      <div class="flabel" id="modalReasonLabel">사유(각 판정의 메모로 기록됨 — 필수)</div>
+      <textarea id="modalReason"></textarea>
+    </div>
+    <div id="modalBtns">
+      <button id="modalCancel">취소</button>
+      <button id="modalConfirm" class="primary">확인</button>
+    </div>
+  </div>
+</div>
+<script src="data.js"></script>
+<script>
+"use strict";
+(function () {
+  var DATA = window.VPATCH_REVIEW_DATA;
+  var listEl = document.getElementById("groupList");
+  if (!DATA || DATA.format !== "vpatch-review-data" || DATA.version !== 1) {
+    var fatal = document.createElement("div");
+    fatal.className = "empty";
+    fatal.textContent = "data.js를 읽을 수 없습니다. tools/review-ui/ 에서 "
+      + "python3 build_data.py 를 실행해 data.js를 생성한 뒤 이 페이지를 다시 여십시오.";
+    document.getElementById("notice").appendChild(fatal);
+    return;
+  }
+
+  // ---- constants & indexes ------------------------------------------------
+  var FINGERPRINT = String(DATA.fingerprint);
+  var FP8 = FINGERPRINT.slice(7, 15);
+  var STORAGE_KEY = "vpatch-review-decisions:" + FP8;
+  var CONST = DATA.constants;
+  var MAX_NOTE = CONST.source_note_max_bytes;
+  var encoder = new TextEncoder();
+  function byteLen(s) { return encoder.encode(s).length; }
+  function fmt(n) { return Number(n).toLocaleString("ko-KR"); }
+  function isoNow() { return new Date().toISOString(); }
+
+  document.getElementById("fpLabel").textContent =
+    "지문 " + FP8 + " · " + fmt(DATA.counts.candidates) + "후보 / "
+    + fmt(DATA.counts.cves_with_candidates) + "CVE · 생성 " + DATA.generated_at;
+
+  var GROUPS = DATA.cves;
+  var byKey = {};
+  GROUPS.forEach(function (g) {
+    g.candidates.forEach(function (c) { byKey[c.key] = { group: g, cand: c }; });
+  });
+
+  // operator §7 checklist (design.md 7, verbatim)
+  var CHECK_LABELS = [
+    "literal이 그 CVE 익스플로잇에서 실제 관측되는가 (제품 고유 경로·파라미터+값·페이로드 토큰 — 문맥 결합형)",
+    "8B 권장·일반 단어 단독 부재",
+    "소문자 ASCII 단일 발행(대소문자 변형 복수 발행 금지 — 오탐 증식)",
+    "pattern_type가 진입점과 일치하는가(바디 룰은 ≤32 별도 예산 — 최우선 CVE만)",
+    "시드 중복·id 규격(vp-cve-<year>-<nnnnn>[-suffix])·category 비예약",
+    "제안 근거(cpe/affected 자동 추출)를 사람이 독립 검증했는가 — 자동 후보는 힌트일 뿐이다(D2)",
+    "식물화 가능성(M8, r2) — 이 literal은 외부 공격자가 원천(공개 PoC 리포·이슈·메타데이터)에 주입해 "
+      + "큐레이션을 오염시킬 수 있는 값인가. 의심 시 제2 원천 교차 또는 기각."
+  ];
+  var HINT_LABELS = {
+    lt_recommended: "8B 미만",
+    gt_max: "256B 초과",
+    generic_standalone: "일반단어 단독",
+    not_lower_ascii: "대문자/비ASCII",
+    not_canonical: "trim 불일치",
+    control_char: "제어문자",
+    seed_duplicate: "시드 중복"
+  };
+  var VERDICT_LABELS = { approved: "승인", rejected: "기각", deferred: "보류" };
+
+  // ---- state --------------------------------------------------------------
+  var decisions = {};   // key -> state
+  var cveMemos = {};
+  var expanded = {};    // cve -> true
+  var undoSnapshot = null;
+  var storageOk = null; // null: no write yet
+  var storageError = "";
+  var lastSaveAt = "";
+  var saveTimer = null;
+
+  function freshState() {
+    return {
+      verdict: null, checks: {}, memo: "", exploit_sample: "",
+      source_note: "", id_suffix: "", decided_at: null
+    };
+  }
+  function st(key) {
+    if (!decisions[key]) { decisions[key] = freshState(); }
+    return decisions[key];
+  }
+  function decidedCount() {
+    var n = 0;
+    for (var k in decisions) { if (decisions[k].verdict) { n++; } }
+    return n;
+  }
+  function progress() {
+    var p = { total: DATA.counts.candidates, approved: 0, rejected: 0, deferred: 0, undecided: 0 };
+    for (var k in decisions) {
+      var v = decisions[k].verdict;
+      if (v === "approved") { p.approved++; }
+      else if (v === "rejected") { p.rejected++; }
+      else if (v === "deferred") { p.deferred++; }
+    }
+    p.undecided = p.total - p.approved - p.rejected - p.deferred;
+    return p;
+  }
+
+  // ---- approval / rejection gates -----------------------------------------
+  function approvalBlockReasons(entry) {
+    var reasons = [];
+    for (var i = 1; i <= 7; i++) {
+      if (entry.state.checks[String(i)] !== true) { reasons.push("§7(" + i + ") 미체크"); }
+    }
+    if (!entry.state.exploit_sample.trim()) { reasons.push("익스플로잇 샘플 필요"); }
+    if (!entry.state.source_note.trim()) { reasons.push("source_note 필요(사람 입력만)"); }
+    else if (byteLen(entry.state.source_note) > MAX_NOTE) {
+      reasons.push("source_note " + MAX_NOTE + "B 초과(현재 " + fmt(byteLen(entry.state.source_note)) + "B)");
+    }
+    return reasons;
+  }
+  function approvalInvalidReasons(entry) {
+    // export validation surface: the save gate plus the id_suffix spec.
+    // The next automation derives the rule id from cve/suffix/ordinal, so a
+    // malformed suffix must not pass validation silently.
+    var reasons = approvalBlockReasons(entry);
+    var sfx = entry.state.id_suffix.trim();
+    if (sfx !== "" && !suffixValid(sfx)) {
+      reasons.push("id_suffix 규격 위반(소문자·숫자·하이픈만)");
+    }
+    return reasons;
+  }
+  function suffixValid(suffix) {
+    return suffix === "" || /^[a-z0-9-]+$/.test(suffix);
+  }
+
+  // ---- persistence ---------------------------------------------------------
+  function scheduleSave() {
+    if (saveTimer) { clearTimeout(saveTimer); }
+    saveTimer = setTimeout(doPersist, 250);
+  }
+  function doPersist() {
+    saveTimer = null;
+    var payload = {
+      format: "vpatch-review-state", version: 1,
+      fingerprint: FINGERPRINT, saved_at: isoNow(),
+      decisions: decisions, cve_memos: cveMemos
+    };
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      storageOk = true; storageError = ""; lastSaveAt = isoNow();
+    } catch (e) {
+      storageOk = false;
+      storageError = (e && e.name) ? e.name : String(e);
+    }
+    updateHeader();
+  }
+  function loadPersisted() {
+    var raw;
+    try { raw = window.localStorage.getItem(STORAGE_KEY); }
+    catch (e) {
+      setNotice("localStorage를 읽지 못했습니다(" + ((e && e.name) || String(e))
+        + "). 이 세션의 판정은 내보내기 파일로만 보존됩니다.", true);
+      return;
+    }
+    if (!raw) { return; }
+    var parsed;
+    try { parsed = JSON.parse(raw); }
+    catch (e) { setNotice("저장 상태 파싱 실패 — 새로 시작합니다.", true); return; }
+    if (!parsed || parsed.format !== "vpatch-review-state" || parsed.version !== 1) {
+      setNotice("저장 상태 형식이 다릅니다 — 새로 시작합니다.", true);
+      return;
+    }
+    if (parsed.fingerprint !== FINGERPRINT) {
+      setNotice("저장 상태의 데이터 지문이 현재 data.js와 불일치 — 자동 복원을 하지 않았습니다. "
+        + "가져오기(JSON 파일)로 복구하십시오.", true);
+      return;
+    }
+    var loaded = 0;
+    var saved = parsed.decisions || {};
+    for (var key in saved) {
+      if (!byKey[key]) { continue; }
+      decisions[key] = hydrate(saved[key]);
+      loaded++;
+    }
+    var memos = parsed.cve_memos || {};
+    for (var cve in memos) { cveMemos[cve] = String(memos[cve]); }
+    if (loaded > 0) { setNotice("localStorage에서 판정 " + fmt(loaded) + "건을 복원했습니다."); }
+  }
+  function hydrate(saved) {
+    var s = freshState();
+    if (saved && typeof saved === "object") {
+      if (saved.verdict === "approved" || saved.verdict === "rejected" || saved.verdict === "deferred") {
+        s.verdict = saved.verdict;
+      }
+      for (var i = 1; i <= 7; i++) { s.checks[String(i)] = saved.checks && saved.checks[String(i)] === true; }
+      s.memo = typeof saved.memo === "string" ? saved.memo : "";
+      s.exploit_sample = typeof saved.exploit_sample === "string" ? saved.exploit_sample : "";
+      s.source_note = typeof saved.source_note === "string" ? saved.source_note : "";
+      s.id_suffix = typeof saved.id_suffix === "string" ? saved.id_suffix : "";
+      s.decided_at = typeof saved.decided_at === "string" ? saved.decided_at : null;
+    }
+    return s;
+  }
+
+  // ---- small DOM helpers ---------------------------------------------------
+  function el(tag, attrs) {
+    var node = document.createElement(tag);
+    if (attrs) {
+      for (var k in attrs) {
+        var v = attrs[k];
+        if (k === "text") { node.textContent = v; }
+        else if (k === "class") { node.className = v; }
+        else if (k === "hidden") { node.hidden = !!v; }
+        else { node.setAttribute(k, v); }
+      }
+    }
+    for (var i = 2; i < arguments.length; i++) {
+      var child = arguments[i];
+      if (child) { node.appendChild(child); }
+    }
+    return node;
+  }
+  function pill(text, cls) { return el("span", { class: "pill " + (cls || "muted"), text: text }); }
+  function setNotice(msg, isError) {
+    var box = document.getElementById("notice");
+    box.textContent = msg;
+    box.className = isError ? "error" : "";
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    if (toastTimer) { clearTimeout(toastTimer); }
+    toastTimer = setTimeout(function () { t.style.display = "none"; }, 1800);
+  }
+  function copyText(text, okMsg) {
+    var done = function () { toast(okMsg || "복사했습니다."); };
+    var fail = function () { toast("복사 실패 — 텍스트를 직접 선택하십시오."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text) ? done() : fail(); });
+    } else {
+      legacyCopy(text) ? done() : fail();
+    }
+  }
+  function legacyCopy(text) {
+    try {
+      var ta = el("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  }
+
+  // ---- modal ---------------------------------------------------------------
+  var modalConfirmCb = null;
+  function showModal(opts) {
+    document.getElementById("modalTitle").textContent = opts.title || "확인";
+    var body = document.getElementById("modalBody");
+    body.textContent = "";
+    opts.lines.forEach(function (line) {
+      body.appendChild(el("div", { text: line }));
+    });
+    var wrap = document.getElementById("modalReasonWrap");
+    var reason = document.getElementById("modalReason");
+    var confirmBtn = document.getElementById("modalConfirm");
+    reason.value = "";
+    if (opts.requireReason) {
+      wrap.hidden = false;
+      confirmBtn.disabled = true;
+      reason.oninput = function () { confirmBtn.disabled = !reason.value.trim(); };
+    } else {
+      wrap.hidden = true;
+      confirmBtn.disabled = false;
+      reason.oninput = null;
+    }
+    modalConfirmCb = function () {
+      closeModal();
+      opts.onConfirm(opts.requireReason ? reason.value.trim() : null);
+    };
+    document.getElementById("modalOverlay").hidden = false;
+    if (opts.requireReason) { reason.focus(); }
+  }
+  function closeModal() {
+    document.getElementById("modalOverlay").hidden = true;
+    modalConfirmCb = null;
+  }
+  document.getElementById("modalCancel").addEventListener("click", closeModal);
+  document.getElementById("modalConfirm").addEventListener("click", function () {
+    if (modalConfirmCb) { modalConfirmCb(); }
+  });
+
+  // ---- anchors (provenance links): DOM property creation only --------------
+  function appendProvenanceLink(container, rawUrl) {
+    var allowed = /^https?:\/\//i.test(rawUrl);
+    if (!allowed) {
+      container.appendChild(el("span", { text: rawUrl, class: "cnt" }));
+      return;
+    }
+    var a = document.createElement("a");
+    a.textContent = rawUrl;
+    a.setAttribute("href", rawUrl);          // dynamic DOM property, scheme allowlisted above
+    a.setAttribute("target", "_blank");
+    a.setAttribute("rel", "noopener noreferrer");
+    container.appendChild(a);
+  }
+
+  // ---- filters -------------------------------------------------------------
+  function cvssThreshold() {
+    var preset = document.getElementById("fCvssPreset").value;
+    if (preset === "custom") {
+      var v = parseFloat(document.getElementById("fCvssCustom").value);
+      return isNaN(v) ? 0 : v;
+    }
+    return parseFloat(preset) || 0;
+  }
+  function groupMatches(g) {
+    var q = document.getElementById("fSearch").value.trim().toLowerCase();
+    if (q) {
+      var inGroup = g.cve.toLowerCase().indexOf(q) !== -1
+        || g.tokens.some(function (t) { return t.toLowerCase().indexOf(q) !== -1; })
+        || g.candidates.some(function (c) { return c.literal.toLowerCase().indexOf(q) !== -1; });
+      if (!inGroup) { return false; }
+    }
+    if (document.getElementById("fKev").checked && !g.kev) { return false; }
+    if (g.cvss < cvssThreshold()) { return false; }
+    var prov = document.getElementById("fProv").value;
+    if (prov !== "all" && !g.candidates.some(function (c) { return c.provenance.kind === prov; })) {
+      return false;
+    }
+    var verdict = document.getElementById("fVerdict").value;
+    if (verdict !== "all" && !g.candidates.some(function (c) { return st(c.key).verdict === verdict; })) {
+      return false;
+    }
+    if (document.getElementById("fHintsOnly").checked
+        && !g.candidates.some(function (c) { return hasAnyHint(c); })) {
+      return false;
+    }
+    return true;
+  }
+  function hasAnyHint(c) {
+    var h = c.hints;
+    return h.lt_recommended || h.gt_max || h.generic_standalone || h.not_lower_ascii
+      || h.not_canonical || h.control_char || h.seed_duplicate;
+  }
+  function sortedGroups() {
+    var g = GROUPS.filter(groupMatches);
+    if (document.getElementById("fSort").value === "cve") {
+      g = g.slice().sort(function (a, b) { return a.cve < b.cve ? -1 : a.cve > b.cve ? 1 : 0; });
+    }
+    return g;
+  }
+  function filteredUndecidedKeys() {
+    var keys = [];
+    sortedGroups().forEach(function (g) {
+      g.candidates.forEach(function (c) {
+        if (!st(c.key).verdict) { keys.push(c.key); }
+      });
+    });
+    return keys;
+  }
+
+  // ---- rendering -----------------------------------------------------------
+  var radioSeq = 0;
+  var groupEls = {};  // cve -> {sumA,sumR,sumD,memoDot,bulkR,bulkD,bulkSpan}
+
+  function ordinalOf(g, cand) {
+    var approvedBefore = 0;
+    for (var i = 0; i < g.candidates.length; i++) {
+      var c = g.candidates[i];
+      if (c === cand) { break; }
+      if (st(c.key).verdict === "approved") { approvedBefore++; }
+    }
+    return approvedBefore + 1;
+  }
+  function pad5(n) { return ("0000" + n).slice(-5); }
+  function previewId(g, cand) {
+    var year = g.cve.slice(4, 8);
+    var n = ordinalOf(g, cand);
+    var sfx = st(cand.key).id_suffix.trim();
+    return "vp-cve-" + year + "-" + pad5(n) + (sfx ? "-" + sfx : "");
+  }
+
+  function renderGroups() {
+    groupEls = {};
+    listEl.textContent = "";
+    var groups = sortedGroups();
+    document.getElementById("shownGroups").textContent = fmt(groups.length);
+    if (!groups.length) {
+      listEl.appendChild(el("div", { class: "empty", text: "필터 조건에 맞는 그룹이 없습니다." }));
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    groups.forEach(function (g) { frag.appendChild(buildGroupRow(g)); });
+    listEl.appendChild(frag);
+  }
+
+  function buildGroupRow(g) {
+    var row = el("div", { class: "grow" });
+    var chev = el("span", { class: "chev", text: expanded[g.cve] ? "▾" : "▸" });
+    var sumA = pill("승인 0", "approved");
+    var sumR = pill("기각 0", "rejected");
+    var sumD = pill("보류 0", "deferred");
+    var memoDot = pill("메모", "muted");
+    memoDot.hidden = true;
+    var body = null;
+    var headBtn = el("button", { class: "ghead" },
+      chev,
+      el("span", { class: "cve", text: g.cve }),
+      g.kev ? pill("KEV", "kev") : null,
+      pill("CVSS " + g.cvss.toFixed(1), g.cvss >= 9.0 ? "critical" : "warning"),
+      pill("후보 " + fmt(g.candidates.length), "muted"),
+      sumA, sumR, sumD, memoDot);
+    headBtn.addEventListener("click", function () {
+      expanded[g.cve] = !expanded[g.cve];
+      if (expanded[g.cve]) {
+        body = buildGroupBody(g);
+        row.appendChild(body);
+      } else if (body) {
+        row.removeChild(body);
+        body = null;
+      }
+      chev.textContent = expanded[g.cve] ? "▾" : "▸";
+    });
+    row.appendChild(headBtn);
+    groupEls[g.cve] = {
+      sumA: sumA, sumR: sumR, sumD: sumD, memoDot: memoDot,
+      bulkR: null, bulkD: null
+    };
+    if (expanded[g.cve]) {
+      body = buildGroupBody(g);
+      row.appendChild(body);
+    }
+    updateGroupSummary(g);
+    return row;
+  }
+
+  function buildGroupBody(g) {
+    var body = el("div", { class: "gbody" });
+    var memo = el("textarea", { placeholder: "CVE 메모 (판정 전체에 참고할 사항)" });
+    memo.value = cveMemos[g.cve] || "";
+    memo.addEventListener("input", function () {
+      if (memo.value) { cveMemos[g.cve] = memo.value; }
+      else { delete cveMemos[g.cve]; }
+      updateGroupSummary(g);
+      scheduleSave();
+    });
+    var memoLabel = el("span", { class: "flabel", text: "CVE 메모" });
+    body.appendChild(el("div", { class: "gmemo" }, memoLabel, memo));
+
+    var bulkSpan = el("span", { text: "" });
+    var bulkR = el("button", { class: "dangerbtn", text: "미판정 기각(사유)" });
+    var bulkD = el("button", { text: "미판정 보류(사유)" });
+    bulkR.addEventListener("click", function () {
+      bulkVerdict(g.candidates.filter(function (c) { return !st(c.key).verdict; }),
+        "rejected", "이 CVE 미판정 후보 기각");
+    });
+    bulkD.addEventListener("click", function () {
+      bulkVerdict(g.candidates.filter(function (c) { return !st(c.key).verdict; }),
+        "deferred", "이 CVE 미판정 후보 보류");
+    });
+    var ge = groupEls[g.cve];
+    ge.bulkR = bulkR;
+    ge.bulkD = bulkD;
+    ge.bulkSpan = bulkSpan;
+    body.appendChild(el("div", { class: "gbulk" },
+      el("span", { class: "flabel", text: "CVE 단위 일괄(승인 없음)" }), bulkR, bulkD, bulkSpan));
+    updateGroupBulk(g, bulkSpan, bulkR, bulkD);
+
+    g.candidates.forEach(function (c) { body.appendChild(buildCandidateRow(g, c)); });
+    return body;
+  }
+
+  function buildCandidateRow(g, c) {
+    var entry = { cand: c, group: g, state: st(c.key) };
+    var row = el("div", { class: "crow" });
+
+    // verdict radios (unique group per candidate; a plain counter cannot
+    // collide between same-prefix literals of one CVE)
+    var radios = {};
+    var radioWrap = el("span", { class: "verdicts" });
+    var radioName = "v-" + radioSeq;  // one shared group per candidate: native mutual exclusion
+    radioSeq++;
+    [["", "미판정"], ["approved", "승인"], ["rejected", "기각"], ["deferred", "보류"]]
+      .forEach(function (pair) {
+        var val = pair[0];
+        var input = el("input", { type: "radio", name: radioName, value: val || "undecided" });
+        input.checked = (entry.state.verdict || "") === val;
+        input.addEventListener("change", function () {
+          if (input.checked) { applyVerdict(entry, val || null); }
+        });
+        radios[val || "undecided"] = input;
+        radioWrap.appendChild(el("label", {}, input, el("span", { text: pair[1] })));
+      });
+    entry.radios = radios;
+
+    var lit = el("code", { class: "literal", text: c.literal, title: "클릭하여 복사" });
+    lit.addEventListener("click", function () { copyText(c.literal, "literal을 복사했습니다."); });
+
+    var badges = [pill(c.hints.bytes + "B", "muted")];
+    for (var hint in HINT_LABELS) {
+      if (c.hints[hint]) { badges.push(pill(HINT_LABELS[hint], "warnbadge")); }
+    }
+    if (c.provenance.kind === "poc_reference") { badges.push(pill("poc_reference", "muted")); }
+    else { badges.push(pill("nvd_cpe", "muted")); }
+
+    var top = el("div", { class: "ctop" }, radioWrap, lit);
+    badges.forEach(function (b) { top.appendChild(b); });
+    var copyBtn = el("button", { text: "복사", title: "literal 클립보드 복사" });
+    copyBtn.addEventListener("click", function () { copyText(c.literal, "literal을 복사했습니다."); });
+    top.appendChild(copyBtn);
+    row.appendChild(top);
+
+    // provenance detail
+    var prov = el("div", { class: "cprov" });
+    var p = c.provenance;
+    if (p.kind === "poc_reference") {
+      prov.appendChild(el("span", { text: "URL:", class: "flabel" }));
+      appendProvenanceLink(prov, String(p.url || ""));
+      if (p.tag) { prov.appendChild(pill("tag: " + p.tag, "muted")); }
+    } else {
+      prov.appendChild(el("span", { text: "field:", class: "flabel" }));
+      prov.appendChild(el("code", { text: String(p.field || "") }));
+      prov.appendChild(el("span", { text: "raw:", class: "flabel" }));
+      prov.appendChild(el("code", { text: String(p.raw || "") }));
+    }
+    row.appendChild(prov);
+
+    // form
+    var form = el("div", { class: "cform" });
+    var checks = el("div", { class: "checks" });
+    for (var i = 1; i <= 7; i++) {
+      (function (idx) {
+        var cb = el("input", { type: "checkbox" });
+        cb.checked = entry.state.checks[String(idx)] === true;
+        cb.addEventListener("change", function () {
+          entry.state.checks[String(idx)] = cb.checked;
+          updateBlockMessage(entry);
+          refreshCandidate(entry, false);
+          scheduleSave();
+        });
+        entry["check" + idx] = cb;
+        checks.appendChild(el("label", {}, cb,
+          el("span", { text: "§7(" + idx + ") " + CHECK_LABELS[idx - 1] })));
+      })(i);
+    }
+    form.appendChild(checks);
+
+    var memoIn = el("input", { type: "text", placeholder: "메모 (기각 시 사유 필수)" });
+    memoIn.value = entry.state.memo;
+    memoIn.addEventListener("input", function () {
+      entry.state.memo = memoIn.value;
+      updateBlockMessage(entry);
+      refreshCandidate(entry, false);
+      scheduleSave();
+    });
+    form.appendChild(el("div", { class: "row" },
+      el("span", { class: "flabel", text: "메모" }), memoIn));
+
+    var sample = el("textarea", { placeholder: "익스플로잇 샘플 (승인 필수 — 탐지 필수 매칭의 원천)" });
+    sample.value = entry.state.exploit_sample;
+    sample.addEventListener("input", function () {
+      entry.state.exploit_sample = sample.value;
+      updateBlockMessage(entry);
+      refreshCandidate(entry, false);
+      scheduleSave();
+    });
+    form.appendChild(el("div", { class: "row" },
+      el("span", { class: "flabel", text: "익스플로잇 샘플" }), sample));
+
+    var note = el("input", { type: "text", placeholder: "출처·라이선스 (사람이 직접 입력 — 자동 채움 없음)" });
+    note.value = entry.state.source_note;
+    var noteCnt = el("span", { class: "cnt" });
+    note.addEventListener("input", function () {
+      entry.state.source_note = note.value;
+      updateNoteCount(entry, noteCnt);
+      updateBlockMessage(entry);
+      refreshCandidate(entry, false);
+      scheduleSave();
+    });
+    entry.noteInput = note;
+    form.appendChild(el("div", { class: "row" },
+      el("span", { class: "flabel", text: "source_note (출처·라이선스)" }), note, noteCnt));
+    updateNoteCount(entry, noteCnt);
+
+    var suffix = el("input", { type: "text", placeholder: "비우면 서수만 사용 (소문자·숫자·하이픈)" });
+    suffix.value = entry.state.id_suffix;
+    var idPrev = el("span", { class: "idprev" });
+    var ordPrev = el("span", { class: "cnt" });
+    suffix.addEventListener("input", function () {
+      entry.state.id_suffix = suffix.value.trim();
+      updateIdPreview(entry, idPrev, ordPrev);
+      scheduleSave();
+    });
+    entry.suffixInput = suffix;
+    form.appendChild(el("div", { class: "row" },
+      el("span", { class: "flabel", text: "id suffix (사람 확정)" }), suffix));
+    form.appendChild(el("div", { class: "row" }, idPrev, ordPrev));
+    updateIdPreview(entry, idPrev, ordPrev);
+
+    form.appendChild(el("div", { class: "row" },
+      el("span", { class: "flabel", text: "category" }),
+      pill(CONST.category, "muted"),
+      el("span", { class: "flabel", text: "권장 severity" }),
+      pill(g.recommended_severity, g.recommended_severity),
+      el("span", { class: "flabel", text: "id 규격" }),
+      el("span", { class: "cnt", text: CONST.id_format })
+    ));
+
+    var status = el("div", { class: "cstatus" });
+    entry.statusEl = status;
+    row.appendChild(form);
+    row.appendChild(status);
+    refreshCandidate(entry, false);
+    return row;
+  }
+
+  function updateNoteCount(entry, cntEl) {
+    var n = byteLen(entry.state.source_note);
+    cntEl.textContent = n + " / " + MAX_NOTE + " B";
+    cntEl.className = n > MAX_NOTE ? "cnt over" : "cnt";
+  }
+
+  function updateIdPreview(entry, idEl, ordEl) {
+    var g = entry.group;
+    idEl.textContent = "id 미리보기: " + previewId(g, entry.cand)
+      + "   (규격: " + CONST.id_format + ")";
+    var sfx = entry.state.id_suffix.trim();
+    var bad = !suffixValid(sfx);
+    ordEl.textContent = "이 CVE의 " + fmt(ordinalOf(g, entry.cand)) + "번째 승인"
+      + (bad ? "  · suffix 규격 위반(소문자·숫자·하이픈만)" : "");
+  }
+
+  function updateBlockMessage(entry) {
+    // keep the transient save-block message in sync while the operator
+    // completes the missing gate inputs (no stale block message)
+    if (!entry.blockVerdict) { return; }
+    if (entry.blockVerdict === "approved") {
+      var reasons = approvalBlockReasons(entry);
+      if (reasons.length) {
+        entry.blockMsg = "승인 저장 차단: " + reasons.join(" · ");
+      } else {
+        entry.blockMsg = "";
+        entry.blockVerdict = "";
+      }
+    } else if (entry.blockVerdict === "rejected") {
+      entry.blockMsg = entry.state.memo.trim()
+        ? "" : "기각 저장 차단: 메모(사유)가 필요합니다.";
+      if (!entry.blockMsg) { entry.blockVerdict = ""; }
+    }
+  }
+
+  function applyVerdict(entry, verdict) {
+    if (verdict === "approved") {
+      var reasons = approvalBlockReasons(entry);
+      if (reasons.length) {
+        entry.blockMsg = "승인 저장 차단: " + reasons.join(" · ");
+        entry.blockVerdict = "approved";
+        refreshCandidate(entry, false);  // syncs radios back to the stored verdict
+        return;
+      }
+    }
+    if (verdict === "rejected" && !entry.state.memo.trim()) {
+      entry.blockMsg = "기각 저장 차단: 메모(사유)가 필요합니다.";
+      entry.blockVerdict = "rejected";
+      refreshCandidate(entry, false);
+      return;
+    }
+    entry.blockMsg = "";
+    entry.blockVerdict = "";
+    entry.state.verdict = verdict;
+    entry.state.decided_at = verdict ? isoNow() : null;
+    refreshCandidate(entry, true);
+    updateGroupSummary(entry.group);
+    scheduleSave();
+    updateHeader();
+  }
+
+  function refreshCandidate(entry, clearBlock) {
+    if (clearBlock) { entry.blockMsg = ""; }
+    var parts = [];
+    if (entry.blockMsg) {
+      entry.statusEl.className = "cstatus block";
+      parts.push(entry.blockMsg);
+    }
+    if (entry.state.verdict === "approved") {
+      var invalid = approvalInvalidReasons(entry);
+      if (invalid.length) {
+        entry.statusEl.className = "cstatus invalid";
+        parts.push("승인 요건 재검증 필요: " + invalid.join(" · ")
+          + " (저장된 승인은 내보내기 validation에 기록됩니다)");
+      }
+    }
+    if (!parts.length) {
+      var decidedAt = entry.state.decided_at
+        ? " · 판정 시각 " + entry.state.decided_at : "";
+      var v = entry.state.verdict ? VERDICT_LABELS[entry.state.verdict] : "미판정";
+      entry.statusEl.className = "cstatus";
+      parts.push("현재 판정: " + v + decidedAt);
+    }
+    entry.statusEl.textContent = parts.join("\n");
+    if (entry.radios) {
+      var want = entry.state.verdict || "";
+      for (var name in entry.radios) {
+        entry.radios[name].checked = (name === "undecided" && want === "") || name === want;
+      }
+    }
+  }
+
+  function updateGroupSummary(g) {
+    var ge = groupEls[g.cve];
+    if (!ge) { return; }
+    var counts = { approved: 0, rejected: 0, deferred: 0 };
+    g.candidates.forEach(function (c) {
+      var v = st(c.key).verdict;
+      if (counts[v] !== undefined) { counts[v]++; }
+    });
+    ge.sumA.textContent = "승인 " + counts.approved;
+    ge.sumR.textContent = "기각 " + counts.rejected;
+    ge.sumD.textContent = "보류 " + counts.deferred;
+    ge.memoDot.hidden = !cveMemos[g.cve];
+    if (ge.bulkSpan && ge.bulkR && ge.bulkD) {
+      updateGroupBulk(g, ge.bulkSpan, ge.bulkR, ge.bulkD);
+    }
+  }
+
+  function updateGroupBulk(g, spanEl, btnR, btnD) {
+    var n = g.candidates.filter(function (c) { return !st(c.key).verdict; }).length;
+    spanEl.textContent = "미판정 " + fmt(n) + "건";
+    btnR.disabled = n === 0;
+    btnD.disabled = n === 0;
+  }
+
+  function updateHeader() {
+    var p = progress();
+    document.getElementById("pTotal").textContent = fmt(p.total);
+    document.getElementById("pApproved").textContent = fmt(p.approved);
+    document.getElementById("pRejected").textContent = fmt(p.rejected);
+    document.getElementById("pDeferred").textContent = fmt(p.deferred);
+    document.getElementById("pUndecided").textContent = fmt(p.undecided);
+
+    var kevGroups = GROUPS.filter(function (g) { return g.kev; }).length;
+    var c90 = GROUPS.filter(function (g) { return g.cvss >= 9.0; }).length;
+    var c98 = GROUPS.filter(function (g) { return g.cvss >= 9.8; }).length;
+    document.getElementById("statKev").textContent = fmt(kevGroups);
+    document.getElementById("statGroups").textContent = fmt(GROUPS.length);
+    document.getElementById("statC90").textContent = fmt(c90);
+    document.getElementById("statC98").textContent = fmt(c98);
+    document.getElementById("statPoc").textContent = fmt(DATA.counts.poc_reference);
+    document.getElementById("statCpe").textContent = fmt(DATA.counts.nvd_cpe);
+
+    var saveText;
+    if (storageOk === null) { saveText = "저장: 대기(변경 없음)"; }
+    else if (storageOk) {
+      saveText = "저장: 성공 " + lastSaveAt.slice(11, 19) + " UTC";
+    } else {
+      saveText = "저장: 실패(" + storageError + ") — 내보내기로 보존하십시오";
+    }
+    document.getElementById("saveStatus").textContent = saveText;
+
+    var badge = document.getElementById("persistBadge");
+    if (storageOk === false && p.approved + p.rejected + p.deferred > 10) {
+      badge.hidden = false;
+      badge.textContent = "미영속 판정 " + fmt(p.approved + p.rejected + p.deferred)
+        + "건 — 내보내기를 권장합니다";
+    } else {
+      badge.hidden = true;
+    }
+
+    document.getElementById("btnUndo").disabled = !undoSnapshot;
+    if (undoSnapshot) {
+      document.getElementById("btnUndo").textContent = "되돌리기: " + undoSnapshot.label;
+    } else {
+      document.getElementById("btnUndo").textContent = "되돌리기";
+    }
+
+    var n = filteredUndecidedKeys().length;
+    document.getElementById("bulkN").textContent = fmt(n);
+    document.getElementById("bulkReject").disabled = n === 0;
+    document.getElementById("bulkDefer").disabled = n === 0;
+  }
+
+  // ---- bulk ------------------------------------------------------------------
+  function bulkVerdict(keys, verdict, label) {
+    if (!keys.length) { return; }
+    showModal({
+      title: (verdict === "rejected" ? "일괄 기각" : "일괄 보류") + " — " + fmt(keys.length) + "건",
+      lines: [
+        "대상: 미판정 " + fmt(keys.length) + "건",
+        "이 작업은 각 후보에 " + VERDICT_LABELS[verdict] + " 판정과 사유를 메모로 기록합니다.",
+        "일괄 승인은 제공하지 않습니다. 실행 후 헤더의 되돌리기로 1단계 취소할 수 있습니다."
+      ],
+      requireReason: true,
+      onConfirm: function (reason) {
+        snapshotFor(keys, []);
+        undoSnapshot.label = fmt(keys.length) + "건 일괄 " + VERDICT_LABELS[verdict] + " 전";
+        var now = isoNow();
+        keys.forEach(function (key) {
+          var s = st(key);
+          s.verdict = verdict;
+          s.memo = reason;
+          s.decided_at = now;
+        });
+        renderGroups();
+        updateHeader();
+        scheduleSave();
+        setNotice(label + " " + fmt(keys.length) + "건 적용(사유: " + reason + ").");
+      }
+    });
+  }
+  function snapshotFor(keys, cves) {
+    var dec = {};
+    keys.forEach(function (key) {
+      dec[key] = hydrate(decisions[key]);
+    });
+    var memos = {};
+    cves.forEach(function (cve) {
+      if (cveMemos[cve] !== undefined) { memos[cve] = cveMemos[cve]; }
+    });
+    undoSnapshot = { label: "", decisions: dec, cve_memos: memos, memo_touched: cves.slice() };
+  }
+
+  // ---- export ------------------------------------------------------------------
+  function buildExport() {
+    var p = progress();
+    var out = {
+      format: "vpatch-review-decisions",
+      version: 1,
+      exported_at: isoNow(),
+      data_fingerprint: FINGERPRINT,
+      cve_memos: {},
+      decisions: [],
+      progress: {
+        total: p.total, approved: p.approved, rejected: p.rejected,
+        deferred: p.deferred, undecided: p.undecided
+      },
+      validation: { invalid_approved_keys: [] }
+    };
+    for (var cve in cveMemos) {
+      if (cveMemos[cve]) { out.cve_memos[cve] = cveMemos[cve]; }
+    }
+    GROUPS.forEach(function (g) {
+      g.candidates.forEach(function (c) {
+        var s = decisions[c.key];
+        if (!s || !s.verdict) { return; }
+        out.decisions.push({
+          key: c.key,
+          cve: g.cve,
+          cve_ids: [g.cve],
+          literal: c.literal,
+          pattern_type: c.pattern_type,
+          provenance: c.provenance,
+          kev: g.kev,
+          cvss: g.cvss,
+          verdict: s.verdict,
+          checks: (function () {
+            var o = {};
+            for (var i = 1; i <= 7; i++) { o[String(i)] = s.checks[String(i)] === true; }
+            return o;
+          })(),
+          memo: s.memo,
+          exploit_sample: s.exploit_sample,
+          source_note: s.source_note,
+          id_suffix: s.id_suffix,
+          recommended_severity: g.recommended_severity,
+          decided_at: s.decided_at
+        });
+        if (s.verdict === "approved") {
+          var reasons = approvalInvalidReasons({ cand: c, group: g, state: s });
+          if (reasons.length) {
+            out.validation.invalid_approved_keys.push({ key: c.key, reasons: reasons });
+          }
+        }
+      });
+    });
+    return out;
+  }
+  document.getElementById("btnExport").addEventListener("click", function () {
+    var data = buildExport();
+    var name = "vpatch-review-decisions-" + FP8 + "-"
+      + isoNow().replace(/[-:]/g, "").replace(/\..+$/, "") + ".json";
+    var blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.textContent = name;
+    a.setAttribute("href", URL.createObjectURL(blob));  // dynamic DOM property
+    a.setAttribute("download", name);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.getAttribute("href")); }, 3000);
+    setNotice("내보냈습니다: " + name + " (판정 " + fmt(data.decisions.length) + "건)");
+  });
+  document.getElementById("btnCopyJson").addEventListener("click", function () {
+    var data = buildExport();
+    copyText(JSON.stringify(data, null, 1),
+      "export JSON을 클립보드에 복사했습니다 (" + fmt(data.decisions.length) + "건).");
+  });
+
+  // ---- import ------------------------------------------------------------------
+  document.getElementById("btnImport").addEventListener("click", function () {
+    document.getElementById("fileInput").click();
+  });
+  document.getElementById("fileInput").addEventListener("change", function () {
+    var input = document.getElementById("fileInput");
+    var file = input.files && input.files[0];
+    input.value = "";
+    if (!file) { return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var parsed;
+      try { parsed = JSON.parse(String(reader.result)); }
+      catch (e) { setNotice("가져오기 실패: JSON 파싱 오류 — " + e, true); return; }
+      if (!parsed || parsed.format !== "vpatch-review-decisions" || parsed.version !== 1) {
+        setNotice("가져오기 실패: 형식이 vpatch-review-decisions v1이 아닙니다.", true);
+        return;
+      }
+      startImport(parsed);
+    };
+    reader.onerror = function () { setNotice("가져오기 실패: 파일을 읽지 못했습니다.", true); };
+    reader.readAsText(file);
+  });
+
+  function startImport(parsed) {
+    var list = Array.isArray(parsed.decisions) ? parsed.decisions : [];
+    var survivors = [];
+    var lost = 0;
+    var breakDown = { approved: 0, rejected: 0, deferred: 0 };
+    list.forEach(function (d) {
+      if (d && typeof d.key === "string" && byKey[d.key]) { survivors.push(d); }
+      else { lost++; }
+    });
+    survivors.forEach(function (d) {
+      if (breakDown[d.verdict] !== undefined) { breakDown[d.verdict]++; }
+    });
+    var undecidedNow = progress().undecided;
+    var memosIn = parsed.cve_memos || {};
+    var memoCount = 0;
+    for (var cve in memosIn) { if (byGroup(cve)) { memoCount++; } }
+
+    if (parsed.data_fingerprint === FINGERPRINT) {
+      showModal({
+        title: "가져오기 — 지문 일치",
+        lines: [
+          "데이터 지문이 현재 data.js와 일치합니다.",
+          "적용 대상 판정 " + fmt(survivors.length) + "건"
+            + "(승인 " + fmt(breakDown.approved) + "·기각 " + fmt(breakDown.rejected)
+            + "·보류 " + fmt(breakDown.deferred) + ")",
+          "CVE 메모 " + fmt(memoCount) + "건"
+        ],
+        requireReason: false,
+        onConfirm: function () { applyImport(survivors, memosIn, lost); }
+      });
+      return;
+    }
+    // fingerprint mismatch: the three-number dialog
+    showModal({
+      title: "가져오기 — 데이터 지문 불일치",
+      lines: [
+        "export의 데이터 지문이 현재 data.js와 다릅니다.",
+        "(1) 현재 데이터에도 존재해 적용될 판정 key: " + fmt(survivors.length) + "건"
+          + "(승인 " + fmt(breakDown.approved) + "·기각 " + fmt(breakDown.rejected)
+          + "·보류 " + fmt(breakDown.deferred) + ")",
+        "(2) 사라진 후보의 판정 key: " + fmt(lost) + "건 — "
+          + "사라진 후보의 판정은 부활하지 않고 폐기됩니다.",
+        "(3) 현재 미판정 후보: " + fmt(undecidedNow) + "건",
+        "CVE 메모 " + fmt(memoCount) + "건도 현재 데이터에 존재하는 CVE만 적용됩니다.",
+        "생존 key에만 적용합니다. 계속할까요?"
+      ],
+      requireReason: false,
+      onConfirm: function () { applyImport(survivors, memosIn, lost); }
+    });
+  }
+  function byGroup(cve) {
+    return GROUPS.some(function (g) { return g.cve === cve; });
+  }
+  function applyImport(survivors, memosIn, lost) {
+    var memoCves = [];
+    for (var cve in memosIn) { if (byGroup(cve)) { memoCves.push(cve); } }
+    // snapshot the memo CVEs the import will touch so undo can restore
+    // or clear them (gap: overwritten CVE memos survived undo)
+    snapshotFor(survivors.map(function (d) { return d.key; }), memoCves);
+    undoSnapshot.label = "가져오기 이전 상태";
+    survivors.forEach(function (d) {
+      var s = freshState();
+      if (d.verdict === "approved" || d.verdict === "rejected" || d.verdict === "deferred") {
+        s.verdict = d.verdict;
+      }
+      for (var i = 1; i <= 7; i++) { s.checks[String(i)] = d.checks && d.checks[String(i)] === true; }
+      s.memo = typeof d.memo === "string" ? d.memo : "";
+      s.exploit_sample = typeof d.exploit_sample === "string" ? d.exploit_sample : "";
+      s.source_note = typeof d.source_note === "string" ? d.source_note : "";
+      s.id_suffix = typeof d.id_suffix === "string" ? d.id_suffix : "";
+      s.decided_at = typeof d.decided_at === "string" ? d.decided_at : null;
+      decisions[d.key] = s;
+    });
+    memoCves.forEach(function (cve) { cveMemos[cve] = String(memosIn[cve]); });
+    var memoApplied = memoCves.length;
+    renderGroups();
+    updateHeader();
+    scheduleSave();
+    var invalid = buildExport().validation.invalid_approved_keys.length;
+    setNotice("가져오기 완료: 적용 " + fmt(survivors.length) + "건 · 소실 폐기 " + fmt(lost)
+      + "건 · CVE 메모 " + fmt(memoApplied) + "건"
+      + (invalid ? " · 경고: 현재 승인 게이트를 통과하지 못하는 승인 " + fmt(invalid) + "건(내보내기 validation 참조)" : ""));
+  }
+
+  // ---- undo ------------------------------------------------------------------
+  document.getElementById("btnUndo").addEventListener("click", function () {
+    if (!undoSnapshot) { return; }
+    var snap = undoSnapshot;
+    undoSnapshot = null;
+    for (var key in snap.decisions) {
+      if (byKey[key]) { decisions[key] = hydrate(snap.decisions[key]); }
+    }
+    (snap.memo_touched || []).forEach(function (cve) {
+      if (snap.cve_memos[cve] !== undefined) { cveMemos[cve] = snap.cve_memos[cve]; }
+      else { delete cveMemos[cve]; }
+    });
+    renderGroups();
+    updateHeader();
+    scheduleSave();
+    setNotice("되돌렸습니다: " + (snap.label || "이전 상태"));
+  });
+
+  // ---- misc wiring --------------------------------------------------------------
+  document.getElementById("bulkReject").addEventListener("click", function () {
+    bulkVerdict(filteredUndecidedKeys(), "rejected", "필터 범위 일괄 기각");
+  });
+  document.getElementById("bulkDefer").addEventListener("click", function () {
+    bulkVerdict(filteredUndecidedKeys(), "deferred", "필터 범위 일괄 보류");
+  });
+  document.getElementById("btnCollapseAll").addEventListener("click", function () {
+    expanded = {};
+    renderGroups();
+  });
+  ["fSearch", "fProv", "fKev", "fCvssPreset", "fCvssCustom", "fVerdict", "fHintsOnly", "fSort"]
+    .forEach(function (id) {
+      var node = document.getElementById(id);
+      node.addEventListener(id === "fSearch" ? "input" : "change", function () {
+        document.getElementById("fCvssCustom").hidden =
+          document.getElementById("fCvssPreset").value !== "custom";
+        renderGroups();
+        updateHeader();
+      });
+    });
+
+  // ---- boot ------------------------------------------------------------------
+  loadPersisted();
+  renderGroups();
+  updateHeader();
+})();
+</script>
+</body>
+</html>
