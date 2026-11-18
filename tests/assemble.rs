@@ -360,10 +360,23 @@ fn unparsable_state_and_non_object_state_refuse() {
 
     // The real committed state (with its extra `note` field) parses:
     // unknown fields are ignored, the bump commit's fields survive.
+    // The live state.json is bump-committed by every release workflow, so
+    // pinning exact values here re-reddens CI on each bump — assert the
+    // invariants instead: the sequence only moves forward from the era
+    // this test was written in, and the key id keeps its 32-hex format.
     let committed = load_state(&PathBuf::from("state.json"));
     if let Ok(state) = committed {
-        assert_eq!(state.sequence, 2);
-        assert_eq!(state.current_key_id, "bed4490644445515f60e1c6cfc919488");
+        assert!(
+            state.sequence >= 2,
+            "sequence regressed: {}",
+            state.sequence
+        );
+        assert!(
+            state.current_key_id.len() == 32
+                && state.current_key_id.bytes().all(|b| b.is_ascii_hexdigit()),
+            "key id is not 32 lowercase hex: {}",
+            state.current_key_id
+        );
     }
 }
 
